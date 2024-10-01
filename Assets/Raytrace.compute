@@ -1,0 +1,28 @@
+#pragma kernel main
+
+#define WORKGROUP_SIZE_X 8
+#define WORKGROUP_SIZE_Y 8
+
+//-------------------------//
+
+RWTexture2D<float4> u_outTexture;
+uint2 u_outTextureDims;
+
+//-------------------------//
+
+[numthreads(WORKGROUP_SIZE_X, WORKGROUP_SIZE_Y, 1)]
+void main(uint3 id : SV_DispatchThreadID)
+{
+    //skip pixels out of texture bounds (happens due to workgroup size):
+	//---------------
+    uint2 writePos = id.xy;
+    if(writePos.x >= u_outTextureDims.x || writePos.y >= u_outTextureDims.y)
+        return;
+
+    //generate ray pos + dir:
+	//---------------
+    float2 pixelCenter = float2((float)writePos.x, (float)writePos.y) + float2(0.5, 0.5);
+    float2 uv = pixelCenter / float2(u_outTextureDims);
+
+    u_outTexture[writePos] = float4(uv.x, uv.y, 0.5, 1.0);
+}
