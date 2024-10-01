@@ -30,7 +30,7 @@ public class Raytracer : MonoBehaviour
 		//-----------------
 		int[] outTextureDims = {m_outTexture.width, m_outTexture.height};
 
-		m_shader.SetTexture(0, "u_outTexture", m_outTexture);
+		m_shader.SetTexture(0, "u_outTexture", m_outTexture); 
 		m_shader.SetInts("u_outTextureDims", outTextureDims);
 
 		//dispatch and blit to target:
