@@ -8,11 +8,17 @@ public class Raytracer : MonoBehaviour
 	[SerializeField]
 	private ComputeShader m_shader;
 	private RenderTexture m_outTexture = null;
+	private Camera m_camera = null;
 
 	private const int WORKGROUP_SIZE_X = 8;
 	private const int WORKGROUP_SIZE_Y = 8;
 
 	//-------------------------//
+
+	private void Awake()
+	{
+		m_camera = GetComponent<Camera>();
+	}
 
 	private void OnRenderImage(RenderTexture src, RenderTexture dst)
 	{
@@ -30,8 +36,11 @@ public class Raytracer : MonoBehaviour
 		//-----------------
 		int[] outTextureDims = {m_outTexture.width, m_outTexture.height};
 
-		m_shader.SetTexture(0, "u_outTexture", m_outTexture); 
+		m_shader.SetTexture(0, "u_outTexture", m_outTexture);
 		m_shader.SetInts("u_outTextureDims", outTextureDims);
+
+		m_shader.SetMatrix("u_invView", m_camera.cameraToWorldMatrix);
+		m_shader.SetMatrix("u_invProj", m_camera.projectionMatrix.inverse);
 
 		//dispatch and blit to target:
 		//-----------------
