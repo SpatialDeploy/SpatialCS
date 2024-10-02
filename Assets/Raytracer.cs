@@ -35,12 +35,14 @@ public class Raytracer : MonoBehaviour
 		//set uniforms:
 		//-----------------
 		int[] outTextureDims = {m_outTexture.width, m_outTexture.height};
-
 		m_shader.SetTexture(0, "u_outTexture", m_outTexture);
 		m_shader.SetInts("u_outTextureDims", outTextureDims);
 
 		m_shader.SetMatrix("u_invView", m_camera.cameraToWorldMatrix);
 		m_shader.SetMatrix("u_invProj", m_camera.projectionMatrix.inverse);
+
+		int[] volumeSize = {10, 10, 10}; //temp
+		m_shader.SetInts("u_volumeSize", volumeSize);
 
 		//dispatch and blit to target:
 		//-----------------
