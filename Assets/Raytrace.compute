@@ -14,6 +14,8 @@ float4x4 u_invView;
 float4x4 u_invProj;
 
 uint3 u_volumeSize;
+StructuredBuffer<uint> u_voxelBitmap;
+StructuredBuffer<uint> u_voxelData;
 
 //-------------------------//
 
@@ -46,31 +48,23 @@ bool in_bounds(uint3 pos)
 
 bool voxel_exists(uint3 pos)
 {
-	float3 normPos = float3(pos) / float3(u_volumeSize);
-	normPos *= 2.0;
-	normPos -= 1.0;
+	uint idx = pos.x + u_volumeSize.x * (pos.y + u_volumeSize.y * pos.z);
+	uint arrIdx = idx / 32;
+	uint bitIdx = idx % 32;
 
-	return dot(normPos, normPos) < 1.0;
-
-	/*let idx = pos.x + u_renderParams.volumeSize.x * (pos.y + u_renderParams.volumeSize.y * pos.z);
-	let arrIdx = idx / 32;
-	let bitIdx = idx % 32;
-
-	return (u_voxelBitmap[arrIdx] & (1u << bitIdx)) != 0;*/
+	return (u_voxelBitmap[arrIdx] & (1u << bitIdx)) != 0;
 }
 
 float3 get_voxel_color(uint3 pos)
 {
-	return float3(pos) / float3(u_volumeSize);
+	uint idx = pos.x + u_volumeSize.x * (pos.y + u_volumeSize.y * pos.z);
+	uint packedColor = u_voxelData[idx];
 
-	/*let idx = pos.x + u_renderParams.volumeSize.x * (pos.y + u_renderParams.volumeSize.y * pos.z);
-	let packedColor = u_voxelData[idx];
+	uint r = (packedColor >> 24) & 0xFF;
+	uint g = (packedColor >> 16) & 0xFF;
+	uint b = (packedColor >> 8) & 0xFF;
 
-	let r = (packedColor >> 24) & 0xFF;
-	let g = (packedColor >> 16) & 0xFF;
-	let b = (packedColor >> 8) & 0xFF;
-
-	return vec3f(f32(r) / 255.0, f32(g) / 255.0, f32(b) / 255.0);*/
+	return float3((float)r / 255.0, (float)g / 255.0, (float)b / 255.0);
 }
 
 struct IntersectVolumeOut
