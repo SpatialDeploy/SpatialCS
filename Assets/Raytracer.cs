@@ -3,15 +3,18 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+//-------------------------//
+
+[RequireComponent(typeof(Camera))]
 public class Raytracer : MonoBehaviour
 {
+	private const int WORKGROUP_SIZE_X = 8;
+	private const int WORKGROUP_SIZE_Y = 8;
+	
 	[SerializeField]
 	private ComputeShader m_shader;
 	private RenderTexture m_outTexture = null;
 	private Camera m_camera = null;
-
-	private const int WORKGROUP_SIZE_X = 8;
-	private const int WORKGROUP_SIZE_Y = 8;
 
 	//-------------------------//
 
