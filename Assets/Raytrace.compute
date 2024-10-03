@@ -3,6 +3,8 @@
 #define WORKGROUP_SIZE_X 8
 #define WORKGROUP_SIZE_Y 8
 
+#define EPSILON 0.0001
+
 //-------------------------//
 
 RWTexture2D<float4> u_outTexture;
@@ -33,6 +35,110 @@ float3 background_color(float3 rayDir)
 {
 	float a = rayDir.y * 0.5 + 0.5;
 	return lerp(float3(0.71, 0.85, 0.90), float3(0.00, 0.45, 0.74), a);
+}
+
+//-------------------------//
+
+bool in_bounds(uint3 pos)
+{
+	return pos.x < u_volumeSize.x && pos.y < u_volumeSize.y && pos.z < u_volumeSize.z;
+}
+
+bool voxel_exists(uint3 pos)
+{
+	float3 normPos = float3(pos) / float3(u_volumeSize);
+	normPos *= 2.0;
+	normPos -= 1.0;
+
+	return dot(normPos, normPos) < 1.0;
+
+	/*let idx = pos.x + u_renderParams.volumeSize.x * (pos.y + u_renderParams.volumeSize.y * pos.z);
+	let arrIdx = idx / 32;
+	let bitIdx = idx % 32;
+
+	return (u_voxelBitmap[arrIdx] & (1u << bitIdx)) != 0;*/
+}
+
+float3 get_voxel_color(uint3 pos)
+{
+	return float3(pos) / float3(u_volumeSize);
+
+	/*let idx = pos.x + u_renderParams.volumeSize.x * (pos.y + u_renderParams.volumeSize.y * pos.z);
+	let packedColor = u_voxelData[idx];
+
+	let r = (packedColor >> 24) & 0xFF;
+	let g = (packedColor >> 16) & 0xFF;
+	let b = (packedColor >> 8) & 0xFF;
+
+	return vec3f(f32(r) / 255.0, f32(g) / 255.0, f32(b) / 255.0);*/
+}
+
+struct IntersectVolumeOut
+{
+	bool hit;
+	float3 color;
+};
+
+//simple DDA voxel traversal algorithm
+//http://www.cse.yorku.ca/~amana/research/grid.pdf
+//https://www.shadertoy.com/view/4dX3zl
+IntersectVolumeOut intersect_volume(float3 rayPos, float3 rayDir, float3 invRayDir)
+{
+	float3 localRayPos = rayPos * float3(u_volumeSize);
+
+	uint3 mapPos = uint3(floor(localRayPos));
+	float3 deltaDist = abs(invRayDir);
+	int3 step = int3(sign(rayDir));
+	float3 sideDist = (sign(rayDir) * (float3(mapPos) - localRayPos) + (sign(rayDir) * 0.5) + 0.5) * deltaDist;
+	float3 lastSideDist = float3(0.0, 0.0, 0.0);
+
+	bool hit = false;
+	while(in_bounds(mapPos))
+	{
+		if(voxel_exists(mapPos))
+		{
+			hit = true;
+			break;
+		}
+
+		lastSideDist = sideDist;
+
+		if(sideDist.x < sideDist.y)
+		{
+			if(sideDist.x < sideDist.z)
+			{
+				sideDist.x += deltaDist.x;
+				mapPos.x += (uint)step.x;
+			}
+			else
+			{
+				sideDist.z += deltaDist.z;
+				mapPos.z += (uint)step.z;
+			}
+		}
+		else
+		{
+			if(sideDist.y < sideDist.z)
+			{
+				sideDist.y += deltaDist.y;
+				mapPos.y += (uint)step.y;
+			}
+			else
+			{
+				sideDist.z += deltaDist.z;
+				mapPos.z += (uint)step.z;
+			}
+		}
+	}
+
+	IntersectVolumeOut retval;
+	retval.hit = hit;
+	if(hit)
+		retval.color = get_voxel_color(mapPos);
+	else
+		retval.color = float3(0.0, 0.0, 0.0);
+
+	return retval;
 }
 
 //-------------------------//
@@ -75,7 +181,21 @@ void main(uint3 id : SV_DispatchThreadID)
     if(intersect.x > intersect.y || intersect.y < 0.0)
         color = background_color(rayDir);
     else
-        color = float3(1.0, 0.0, 0.0);
+	{
+		float3 startRayPos = rayPos;
+		if(intersect.x > 0.0)
+			startRayPos += rayDir * (intersect.x + EPSILON);
+
+		startRayPos -= volumeMin;
+		startRayPos /= (volumeMax - volumeMin);
+
+		IntersectVolumeOut result = intersect_volume(startRayPos, rayDir, invRayDir);
+
+		if(result.hit)
+			color = result.color;
+		else
+			color = background_color(rayDir);
+	}
 
     //write final color:
 	//---------------
