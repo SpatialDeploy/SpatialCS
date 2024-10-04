@@ -98,8 +98,11 @@ public class Raytracer : MonoBehaviour
 		m_shader.SetBuffer(0, "u_voxelBitmap", m_tempBitmapBuffer);
 		m_shader.SetBuffer(0, "u_voxelData", m_tempVoxelDataBuffer);
 
+		//TODO: in forward rendering mode the "_CameraDepthTexture" seems to lag one frame behind
+		//figure out how to fix this in case we don't want to use deferred rendering
+
 		m_shader.SetTexture(0, "u_srcColorTexture", src);
-		m_shader.SetTexture(0, "u_srcDepthTexture", Shader.GetGlobalTexture("_CameraDepthTexture"));
+		m_shader.SetTextureFromGlobal(0, "u_srcDepthTexture", "_CameraDepthTexture");
 
 		//dispatch and blit to target:
 		//-----------------
