@@ -28,6 +28,7 @@ public class Raytracer : MonoBehaviour
 	private void Awake()
 	{
 		m_camera = GetComponent<Camera>();
+		m_camera.depthTextureMode = DepthTextureMode.Depth;
 
 		m_tempVolumeSize = new Vector3Int(10, 10, 10);
 		
@@ -96,6 +97,9 @@ public class Raytracer : MonoBehaviour
 		m_shader.SetInts("u_volumeSize", volumeSize);
 		m_shader.SetBuffer(0, "u_voxelBitmap", m_tempBitmapBuffer);
 		m_shader.SetBuffer(0, "u_voxelData", m_tempVoxelDataBuffer);
+
+		m_shader.SetTexture(0, "u_srcColorTexture", src);
+		m_shader.SetTexture(0, "u_srcDepthTexture", Shader.GetGlobalTexture("_CameraDepthTexture"));
 
 		//dispatch and blit to target:
 		//-----------------

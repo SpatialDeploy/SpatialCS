@@ -1,5 +1,7 @@
 #pragma kernel main
 
+#include "UnityCG.cginc"
+
 #define WORKGROUP_SIZE_X 8
 #define WORKGROUP_SIZE_Y 8
 
@@ -17,6 +19,11 @@ uint3 u_volumeSize;
 StructuredBuffer<uint> u_voxelBitmap;
 StructuredBuffer<uint> u_voxelData;
 
+Texture2D<float4> u_srcDepthTexture;
+Texture2D<float4> u_srcColorTexture;
+SamplerState sampleru_srcColorTexture;
+SamplerState sampleru_srcDepthTexture;
+
 //-------------------------//
 
 float2 intersect_aabb(float3 boxMin, float3 boxMax, float3 rayPos, float3 invRayDir)
@@ -33,10 +40,9 @@ float2 intersect_aabb(float3 boxMin, float3 boxMax, float3 rayPos, float3 invRay
 	return float2(tNear, tFar);
 }
 
-float3 background_color(float3 rayDir)
+float3 background_color(float2 uv)
 {
-	float a = rayDir.y * 0.5 + 0.5;
-	return lerp(float3(0.71, 0.85, 0.90), float3(0.00, 0.45, 0.74), a);
+	return u_srcColorTexture.SampleLevel(sampleru_srcColorTexture, uv, 0).xyz;
 }
 
 //-------------------------//
@@ -71,6 +77,7 @@ struct IntersectVolumeOut
 {
 	bool hit;
 	float3 color;
+	float3 hitPos;
 };
 
 //simple DDA voxel traversal algorithm
@@ -78,12 +85,12 @@ struct IntersectVolumeOut
 //https://www.shadertoy.com/view/4dX3zl
 IntersectVolumeOut intersect_volume(float3 rayPos, float3 rayDir, float3 invRayDir)
 {
-	float3 localRayPos = rayPos * float3(u_volumeSize);
+	rayPos *= float3(u_volumeSize);
 
-	uint3 mapPos = uint3(floor(localRayPos));
+	uint3 mapPos = uint3(floor(rayPos));
 	float3 deltaDist = abs(invRayDir);
 	int3 step = int3(sign(rayDir));
-	float3 sideDist = (sign(rayDir) * (float3(mapPos) - localRayPos) + (sign(rayDir) * 0.5) + 0.5) * deltaDist;
+	float3 sideDist = (sign(rayDir) * (float3(mapPos) - rayPos) + (sign(rayDir) * 0.5) + 0.5) * deltaDist;
 	float3 lastSideDist = float3(0.0, 0.0, 0.0);
 
 	bool hit = false;
@@ -127,10 +134,20 @@ IntersectVolumeOut intersect_volume(float3 rayPos, float3 rayDir, float3 invRayD
 
 	IntersectVolumeOut retval;
 	retval.hit = hit;
+
 	if(hit)
+	{
 		retval.color = get_voxel_color(mapPos);
+
+		float3 hitPos = rayPos + rayDir * min(min(lastSideDist.x, lastSideDist.y), lastSideDist.z);
+		hitPos /= float3(u_volumeSize);
+		retval.hitPos = hitPos;
+	}
 	else
+	{
 		retval.color = float3(0.0, 0.0, 0.0);
+		retval.hitPos = float3(0.0, 0.0, 0.0);
+	}
 
 	return retval;
 }
@@ -173,7 +190,7 @@ void main(uint3 id : SV_DispatchThreadID)
 	//---------------    
     float3 color;
     if(intersect.x > intersect.y || intersect.y < 0.0)
-        color = background_color(rayDir);
+        color = background_color(uv);
     else
 	{
 		float3 startRayPos = rayPos;
@@ -186,9 +203,22 @@ void main(uint3 id : SV_DispatchThreadID)
 		IntersectVolumeOut result = intersect_volume(startRayPos, rayDir, invRayDir);
 
 		if(result.hit)
-			color = result.color;
+		{
+			float maxDepthClip = u_srcDepthTexture.SampleLevel(sampleru_srcDepthTexture, uv, 0);
+			float maxDepth = LinearEyeDepth(maxDepthClip);
+
+			float3 hitPos = result.hitPos;
+			hitPos *= (volumeMax - volumeMin);
+			hitPos += volumeMin;
+			float traceDepth = -UnityWorldToViewPos(hitPos).z;
+
+			if(maxDepth < traceDepth)
+				color = background_color(uv);
+			else
+				color = result.color;
+		}
 		else
-			color = background_color(rayDir);
+			color = background_color(uv);
 	}
 
     //write final color:
