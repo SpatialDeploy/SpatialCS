@@ -25,12 +25,12 @@ public class OrbitController : MonoBehaviour
 
     //-------------------------//
 
-    void Awake()
+    private void Awake()
     {
         m_radius = (m_minRad + m_maxRad) / 2.0f;
     }
 
-    void LateUpdate()
+    private void LateUpdate()
     {
         if(Input.GetMouseButton(0))
         {

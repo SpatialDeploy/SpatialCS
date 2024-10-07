@@ -6,6 +6,15 @@ using UnityEngine;
 
 //-------------------------//
 
+public class VoxelVolume
+{
+	public Vector3Int size;
+	public ComputeBuffer bitmapBuf;
+	public ComputeBuffer voxelDataBuf;
+};
+
+//-------------------------//
+
 [RequireComponent(typeof(Camera))]
 public class Raytracer : MonoBehaviour
 {
@@ -13,52 +22,51 @@ public class Raytracer : MonoBehaviour
 	private const int WORKGROUP_SIZE_Y = 8;
 	
 	[SerializeField]
-	private ComputeShader m_shader;
+	private ComputeShader m_shader = null;
 	private RenderTexture m_outTexture = null;
 	private Camera m_camera = null;
 	[SerializeField]
 	private GameObject m_volumeObject = null;
 
-	//-------------------------//
-
-	private ComputeBuffer m_tempBitmapBuffer;
-	private ComputeBuffer m_tempVoxelDataBuffer;	
-	private Vector3Int m_tempVolumeSize;
+	private VoxelVolume m_curVolume = null;
 
 	//-------------------------//
 
-	private void Awake()
+	public void SetCurrentVolume(VoxelVolume volume)
 	{
-		m_camera = GetComponent<Camera>();
-		m_camera.depthTextureMode = DepthTextureMode.Depth;
+		m_curVolume = volume;
+	}
 
-		m_tempVolumeSize = new Vector3Int(10, 10, 10);
+	//-------------------------//
+
+	public static VoxelVolume CreateVolume(Vector3Int size, string[] voxels)
+	{
+		VoxelVolume volume = new VoxelVolume();
+		volume.size = new Vector3Int(size.x, size.z, size.y);
 		
-		int bitmapSize = m_tempVolumeSize.x * m_tempVolumeSize.y * m_tempVolumeSize.z;
+		int bitmapSize = volume.size.x * volume.size.y * volume.size.z;
 		bitmapSize = (bitmapSize + 31) & ~31; //align up to multiple of 32
 		bitmapSize /= 32; //32 bits per uint32
 		uint[] bitmap = new uint[bitmapSize];
 
-		int voxelDataSize = m_tempVolumeSize.x * m_tempVolumeSize.y * m_tempVolumeSize.z;
+		int voxelDataSize = volume.size.x * volume.size.y * volume.size.z;
 		uint[] voxelData = new uint[voxelDataSize]; //1 uint32 per voxel (RGB color, 8 bits per component)
 
-		for(int z = 0; z < m_tempVolumeSize.z; z++)
-		for(int y = 0; y < m_tempVolumeSize.y; y++)
-		for(int x = 0; x < m_tempVolumeSize.x; x++)
+		for(int z = 0; z < volume.size.z; z++)
+		for(int y = 0; y < volume.size.y; y++)
+		for(int x = 0; x < volume.size.x; x++)
 		{
-			int idx = x + m_tempVolumeSize.x * (y + m_tempVolumeSize.y * z);
+			int idx = x + volume.size.x * (y + volume.size.y * z);
+			int readIdx = x + volume.size.x * (z + volume.size.z * y);
 
-			float normX = (x + 0.5f) / (float)m_tempVolumeSize.x * 2.0f - 1.0f;
-			float normY = (y + 0.5f) / (float)m_tempVolumeSize.y * 2.0f - 1.0f;
-			float normZ = (z + 0.5f) / (float)m_tempVolumeSize.z * 2.0f - 1.0f;
-
-			if(normX * normX + normY * normY + normZ * normZ < 1.0f)
+			string voxel = voxels[readIdx];
+			if(voxel != null)
 			{
 				bitmap[idx / 32] |= 1u << (idx % 32);
 
-				uint r = (uint)((normX * 0.5f + 0.5f) * 255.0f);
-				uint g = (uint)((normY * 0.5f + 0.5f) * 255.0f);
-				uint b = (uint)((normZ * 0.5f + 0.5f) * 255.0f);
+				uint r = Convert.ToUInt32(voxel.Substring(1, 2), 16);
+				uint g = Convert.ToUInt32(voxel.Substring(3, 2), 16);
+				uint b = Convert.ToUInt32(voxel.Substring(5, 2), 16);
 				uint packedColor = (r << 24) | (g << 16) | (b << 8);
 
 				voxelData[idx] = packedColor;
@@ -67,15 +75,39 @@ public class Raytracer : MonoBehaviour
 				bitmap[idx / 32] &= ~(1u << (idx % 32));
 		}
 
-		m_tempBitmapBuffer = new ComputeBuffer(bitmapSize, sizeof(uint));
-		m_tempBitmapBuffer.SetData(bitmap);
+		volume.bitmapBuf = new ComputeBuffer(bitmapSize, sizeof(uint));
+		volume.bitmapBuf.SetData(bitmap);
 		
-		m_tempVoxelDataBuffer = new ComputeBuffer(voxelDataSize, sizeof(uint));
-		m_tempVoxelDataBuffer.SetData(voxelData);
+		volume.voxelDataBuf = new ComputeBuffer(voxelDataSize, sizeof(uint));
+		volume.voxelDataBuf.SetData(voxelData);
+
+		return volume;
+	}
+
+	public static void DestroyVolume(VoxelVolume volume)
+	{
+		volume.bitmapBuf.Release();
+		volume.voxelDataBuf.Release();
+	}
+
+	//-------------------------//
+
+	private void Awake()
+	{
+		m_camera = GetComponent<Camera>();
+		m_camera.depthTextureMode = DepthTextureMode.Depth;
 	}
 
 	private void OnRenderImage(RenderTexture src, RenderTexture dst)
 	{
+		//dont render if no volume or shader is specified:
+		//-----------------	
+		if(m_shader == null || m_curVolume == null)
+		{
+			Graphics.Blit(src, dst);
+			return;
+		}
+
 		//recreate output texture if needed:
 		//-----------------	
 		if(m_outTexture == null || m_outTexture.width != Screen.width || m_outTexture.height != Screen.height)
@@ -114,10 +146,10 @@ public class Raytracer : MonoBehaviour
 		m_shader.SetMatrix("u_invView", m_camera.cameraToWorldMatrix);
 		m_shader.SetMatrix("u_invProj", m_camera.projectionMatrix.inverse);
 
-		int[] volumeSize = {m_tempVolumeSize.x, m_tempVolumeSize.y, m_tempVolumeSize.z}; //temp
+		int[] volumeSize = {m_curVolume.size.x, m_curVolume.size.y, m_curVolume.size.z}; //temp
 		m_shader.SetInts("u_volumeSize", volumeSize);
-		m_shader.SetBuffer(0, "u_voxelBitmap", m_tempBitmapBuffer);
-		m_shader.SetBuffer(0, "u_voxelData", m_tempVoxelDataBuffer);
+		m_shader.SetBuffer(0, "u_voxelBitmap", m_curVolume.bitmapBuf);
+		m_shader.SetBuffer(0, "u_voxelData", m_curVolume.voxelDataBuf);
 
 		//TODO: in forward rendering mode the "_CameraDepthTexture" seems to lag one frame behind
 		//figure out how to fix this in case we don't want to use deferred rendering
@@ -132,12 +164,6 @@ public class Raytracer : MonoBehaviour
 		m_shader.Dispatch(0, numWorkgroupsX, numWorkgroupsY, 1);
 
 		Graphics.Blit(m_outTexture, dst);
-	}
-
-	private void OnDestroy()
-	{
-		m_tempBitmapBuffer.Release();
-		m_tempVoxelDataBuffer.Release();
 	}
 
 	//-------------------------//
