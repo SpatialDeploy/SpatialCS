@@ -12,6 +12,8 @@
 RWTexture2D<float4> u_outTexture;
 uint2 u_outTextureDims;
 
+float4x4 u_model;
+float4x4 u_invModel;
 float4x4 u_invView;
 float4x4 u_invProj;
 
@@ -176,13 +178,25 @@ void main(uint3 id : SV_DispatchThreadID)
 
 	float3 rayPos = rayPos4.xyz;
 	float3 rayDir = normalize(rayDir4.xyz);
-    float3 invRayDir = 1.0 / rayDir;
+
+	//transform raypos and raydir to local space:
+	//---------------
+	float3 rayPosWorld = rayPos;
+
+	float4x4 modelNoTranslate = u_invModel;
+	modelNoTranslate[0][3] = 0.0;
+	modelNoTranslate[1][3] = 0.0;
+	modelNoTranslate[2][3] = 0.0;
+
+	rayPos = mul(u_invModel, float4(rayPos, 1.0)).xyz;
+	rayDir = mul(modelNoTranslate, float4(rayDir, 1.0)).xyz;
+	float3 invRayDir = 1.0 / rayDir;
 
 	//check for intersection with bounding cube:
 	//---------------
     uint maxSize = max(max(u_volumeSize.x, u_volumeSize.y), u_volumeSize.z);
-	float3 volumeMin = -float3(u_volumeSize) / (float)maxSize;
-	float3 volumeMax =  float3(u_volumeSize) / (float)maxSize;
+	float3 volumeMin = -float3(u_volumeSize) / (float)maxSize / 2.0;
+	float3 volumeMax =  float3(u_volumeSize) / (float)maxSize / 2.0; 
 
 	float2 intersect = intersect_aabb(volumeMin, volumeMax, rayPos, invRayDir);
 
@@ -210,6 +224,8 @@ void main(uint3 id : SV_DispatchThreadID)
 			float3 hitPos = result.hitPos;
 			hitPos *= (volumeMax - volumeMin);
 			hitPos += volumeMin;
+			hitPos = mul(u_model, float4(hitPos, 1.0)).xyz;
+
 			float traceDepth = -UnityWorldToViewPos(hitPos).z;
 
 			if(maxDepth < traceDepth)

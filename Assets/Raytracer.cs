@@ -16,6 +16,8 @@ public class Raytracer : MonoBehaviour
 	private ComputeShader m_shader;
 	private RenderTexture m_outTexture = null;
 	private Camera m_camera = null;
+	[SerializeField]
+	private GameObject m_volumeObject = null;
 
 	//-------------------------//
 
@@ -46,9 +48,9 @@ public class Raytracer : MonoBehaviour
 		{
 			int idx = x + m_tempVolumeSize.x * (y + m_tempVolumeSize.y * z);
 
-			float normX = (float)x / (float)m_tempVolumeSize.x * 2.0f - 1.0f;
-			float normY = (float)y / (float)m_tempVolumeSize.y * 2.0f - 1.0f;
-			float normZ = (float)z / (float)m_tempVolumeSize.z * 2.0f - 1.0f;
+			float normX = (x + 0.5f) / (float)m_tempVolumeSize.x * 2.0f - 1.0f;
+			float normY = (y + 0.5f) / (float)m_tempVolumeSize.y * 2.0f - 1.0f;
+			float normZ = (z + 0.5f) / (float)m_tempVolumeSize.z * 2.0f - 1.0f;
 
 			if(normX * normX + normY * normY + normZ * normZ < 1.0f)
 			{
@@ -84,12 +86,31 @@ public class Raytracer : MonoBehaviour
 			CreateOutputTexture(Screen.width, Screen.height);
 		}
 
+		//get volume transform matrix:
+		//-----------------
+		Matrix4x4 worldToLocal, localToWorld;
+		if(m_volumeObject)
+		{
+			Transform transform = m_volumeObject.GetComponent<Transform>();
+			if(transform)
+			{
+				worldToLocal = transform.worldToLocalMatrix;
+				localToWorld = transform.localToWorldMatrix;
+			}
+			else
+				worldToLocal = localToWorld = Matrix4x4.identity;
+		}
+		else
+			worldToLocal = localToWorld = Matrix4x4.identity;
+
 		//set uniforms:
 		//-----------------
 		int[] outTextureDims = {m_outTexture.width, m_outTexture.height};
 		m_shader.SetTexture(0, "u_outTexture", m_outTexture);
 		m_shader.SetInts("u_outTextureDims", outTextureDims);
 
+		m_shader.SetMatrix("u_model", localToWorld);
+		m_shader.SetMatrix("u_invModel", worldToLocal);
 		m_shader.SetMatrix("u_invView", m_camera.cameraToWorldMatrix);
 		m_shader.SetMatrix("u_invProj", m_camera.projectionMatrix.inverse);
 
