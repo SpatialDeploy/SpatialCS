@@ -134,8 +134,9 @@ GameObject:
   - component: {fileID: 866083087}
   - component: {fileID: 866083086}
   - component: {fileID: 866083085}
+  - component: {fileID: 866083089}
   m_Layer: 0
-  m_Name: Cube
+  m_Name: Playhead
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -220,13 +221,26 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 866083084}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.86411786, y: 0.85, z: 0.5603934}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: -0.55, z: 0.55}
+  m_LocalScale: {x: 1, y: 0.1, z: 0.1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 871785473}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &866083089
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 866083084}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 507fecd5f59a9ee4395b3b0aabf1724e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_camera: {fileID: 963194225}
 --- !u!1 &871785469
 GameObject:
   m_ObjectHideFlags: 0
@@ -252,13 +266,14 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 871785469}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: 0, y: 0.38268343, z: 0, w: 0.92387956}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 866083088}
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 45, z: 0}
 --- !u!65 &871785476
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -276,7 +291,7 @@ BoxCollider:
   m_LayerOverridePriority: 0
   m_IsTrigger: 0
   m_ProvidesContacts: 0
-  m_Enabled: 0
+  m_Enabled: 1
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
@@ -401,7 +416,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f0cf35e6f8fc031418c2a804a63a542e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_minRad: 1
+  m_minRad: 0.5
   m_maxRad: 3
   m_sensitivity: 5.77
   m_scrollSensitivity: 1
@@ -423,4 +438,3 @@ SceneRoots:
   m_Roots:
   - {fileID: 963194228}
   - {fileID: 871785473}
-  - {fileID: 866083088}
