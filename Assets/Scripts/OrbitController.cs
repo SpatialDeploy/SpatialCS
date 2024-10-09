@@ -32,7 +32,7 @@ public class OrbitController : MonoBehaviour
 
     private void LateUpdate()
     {
-        if(Input.GetMouseButton(0))
+        if(Input.GetMouseButton(1))
         {
             m_theta += Input.GetAxis("Mouse X") * m_sensitivity;
             m_phi -= Input.GetAxis("Mouse Y") * m_sensitivity;

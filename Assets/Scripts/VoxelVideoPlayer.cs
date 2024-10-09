@@ -22,21 +22,68 @@ public class VoxelVideo
 
 //-------------------------//
 
-[RequireComponent(typeof(Raytracer))]
 public class VoxelVideoPlayer : MonoBehaviour
 {
     private VoxelVideo m_video = null;
     private Raytracer m_raytracer = null;
     private VoxelVolume m_curVolume = null;
 
-    private float m_startTime = 0.0f;
+    private float m_curTime = 0.0f;
     private int m_curFrame = 0;
+
+    private bool m_isPlaying = false;
+    private bool m_adjustingProgress = false;
+
+    //-------------------------//
+
+    public void PauseButtonClicked()
+    {
+        m_isPlaying = !m_isPlaying;
+    }
+
+    public bool IsPlaying()
+    {
+        return m_isPlaying;
+    }
+
+    public void SetProgress(float val)
+    {
+        if(m_video == null)
+            return;
+
+        m_curTime = val * m_video.duration;
+    }
+
+    public void SetAdjustingProgess(bool adjusting)
+    {
+        m_adjustingProgress = adjusting;
+    }
+
+    public float GetProgress()
+    {
+        if(m_video == null)
+            return 0.0f;
+
+        return (m_curTime / m_video.duration) % 1.0f;
+    }
 
     //-------------------------//
 
     private void Start()
     {
-        m_raytracer = GetComponent<Raytracer>();
+        Camera camera = Camera.main;
+        if(camera == null)
+        {
+            Debug.LogWarning("Failed to find main camera");
+            return;
+        }
+
+        m_raytracer = camera.GetComponent<Raytracer>();
+        if(m_raytracer == null)
+        {
+            Debug.LogWarning("Main camera does not have Raytracer behavior");
+            return;
+        }
 
         m_video = LoadVoxelVideo("Videos/cake");
         if(m_video == null)
@@ -45,7 +92,8 @@ public class VoxelVideoPlayer : MonoBehaviour
             return;
         }
 
-        m_startTime = Time.time;
+        m_isPlaying = true;
+        m_curTime = 0.0f;
         m_curFrame = 0;
 
         m_curVolume = Raytracer.CreateVolume(m_video.size, m_video.frames[m_curFrame]);
@@ -54,15 +102,17 @@ public class VoxelVideoPlayer : MonoBehaviour
 
     private void Update()
     {
-        //skip if video wasnt loaded:
+        //skip if video wasnt loaded or raytracer wasnt found:
 	    //-----------------
-        if(m_video == null)
+        if(m_video == null || m_raytracer == null)
             return;
 
 	    //update video frame if necessary:
 	    //-----------------
-        float curTime = Time.time - m_startTime;
-        int frame = (int)(curTime * m_video.framerate);
+        if(m_isPlaying && !m_adjustingProgress)
+            m_curTime += Time.deltaTime;
+
+        int frame = (int)(m_curTime * m_video.framerate);
         frame %= m_video.numFrames;
 
         if(m_curFrame != frame)
