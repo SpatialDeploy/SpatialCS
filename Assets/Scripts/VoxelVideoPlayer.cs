@@ -28,6 +28,10 @@ public class VoxelVideoPlayer : MonoBehaviour
     private Raytracer m_raytracer = null;
     private VoxelVolume m_curVolume = null;
 
+    private const float BOUNDING_BOX_WIDTH = 0.005f;
+    private readonly Vector3[] m_boundingBoxCorners = new Vector3[8];
+    private readonly LineRenderer[] m_lineRenderers = new LineRenderer[12];
+
     private float m_curTime = 0.0f;
     private int m_curFrame = 0;
 
@@ -67,10 +71,20 @@ public class VoxelVideoPlayer : MonoBehaviour
         return (m_curTime / m_video.duration) % 1.0f;
     }
 
+    public Vector3Int GetVideoResolution()
+    {
+        if(m_video == null)
+            return new Vector3Int(0, 0, 0);
+
+        return new Vector3Int(m_video.size.x, m_video.size.z, m_video.size.y);
+    }
+
     //-------------------------//
 
     private void Start()
     {
+        //get raytracer:
+	    //-----------------
         Camera camera = Camera.main;
         if(camera == null)
         {
@@ -85,6 +99,8 @@ public class VoxelVideoPlayer : MonoBehaviour
             return;
         }
 
+        //load video:
+	    //-----------------
         m_video = LoadVoxelVideo("Videos/cake");
         if(m_video == null)
         {
@@ -92,12 +108,18 @@ public class VoxelVideoPlayer : MonoBehaviour
             return;
         }
 
+        //setup video playback params:
+	    //-----------------
         m_isPlaying = true;
         m_curTime = 0.0f;
         m_curFrame = 0;
 
         m_curVolume = Raytracer.CreateVolume(m_video.size, m_video.frames[m_curFrame]);
         m_raytracer.SetCurrentVolume(m_curVolume);
+
+        //setup bounding box rendering:
+	    //-----------------
+        SetupBoundingBox();
     }
 
     private void Update()
@@ -124,6 +146,10 @@ public class VoxelVideoPlayer : MonoBehaviour
             m_raytracer.SetCurrentVolume(m_curVolume);
             m_curFrame = frame;
         }
+
+	    //draw bounding box:
+	    //-----------------
+        DrawBoundingBox();
     }
 
     private void OnDestroy()
@@ -196,5 +222,73 @@ public class VoxelVideoPlayer : MonoBehaviour
         }
 
         return video;
+    }
+    private void SetupBoundingBox()
+    {
+        //create line renderers:
+	    //-----------------
+        GameObject linesParent = new GameObject("BoundingBoxLines");
+        linesParent.transform.SetParent(transform);
+        for(int i = 0; i < 12; i++)
+        {
+            GameObject lineObj = new GameObject($"Line_{i}");
+            lineObj.transform.SetParent(linesParent.transform);
+            
+            LineRenderer line = lineObj.AddComponent<LineRenderer>();
+            line.positionCount = 2;
+            line.startWidth = BOUNDING_BOX_WIDTH;
+            line.endWidth = BOUNDING_BOX_WIDTH;
+            line.material = new Material(Shader.Find("Sprites/Default"));
+            line.startColor = Color.black;
+            line.endColor = Color.black;
+            
+            m_lineRenderers[i] = line;
+        }
+
+        //generate line vertex positions:
+	    //-----------------
+        Vector3Int videoSize = GetVideoResolution();
+		int maxSize = Math.Max(Math.Max(videoSize.x, videoSize.y), videoSize.z);
+
+        Vector3 minBounds = new Vector3(-(float)videoSize.x / maxSize / 2.0f, -(float)videoSize.y / maxSize / 2.0f, -(float)videoSize.z / maxSize / 2.0f);
+        Vector3 maxBounds = new Vector3( (float)videoSize.x / maxSize / 2.0f,  (float)videoSize.y / maxSize / 2.0f,  (float)videoSize.z / maxSize / 2.0f);
+
+        m_boundingBoxCorners[0] = new Vector3(minBounds.x, minBounds.y, minBounds.z);
+        m_boundingBoxCorners[1] = new Vector3(minBounds.x, minBounds.y, maxBounds.z);
+        m_boundingBoxCorners[2] = new Vector3(minBounds.x, maxBounds.y, minBounds.z);
+        m_boundingBoxCorners[3] = new Vector3(minBounds.x, maxBounds.y, maxBounds.z);
+        m_boundingBoxCorners[4] = new Vector3(maxBounds.x, minBounds.y, minBounds.z);
+        m_boundingBoxCorners[5] = new Vector3(maxBounds.x, minBounds.y, maxBounds.z);
+        m_boundingBoxCorners[6] = new Vector3(maxBounds.x, maxBounds.y, minBounds.z);
+        m_boundingBoxCorners[7] = new Vector3(maxBounds.x, maxBounds.y, maxBounds.z);
+
+        for(int i = 0; i < 8; i++)
+            m_boundingBoxCorners[i] = transform.TransformPoint(m_boundingBoxCorners[i]);
+    }
+    
+    private void DrawBoundingBox()
+    {
+        int lineIndex = 0;
+        
+        SetLinePositions(lineIndex++, m_boundingBoxCorners[0], m_boundingBoxCorners[1]);
+        SetLinePositions(lineIndex++, m_boundingBoxCorners[0], m_boundingBoxCorners[2]);
+        SetLinePositions(lineIndex++, m_boundingBoxCorners[1], m_boundingBoxCorners[3]);
+        SetLinePositions(lineIndex++, m_boundingBoxCorners[2], m_boundingBoxCorners[3]);
+        
+        SetLinePositions(lineIndex++, m_boundingBoxCorners[4], m_boundingBoxCorners[5]);
+        SetLinePositions(lineIndex++, m_boundingBoxCorners[4], m_boundingBoxCorners[6]);
+        SetLinePositions(lineIndex++, m_boundingBoxCorners[5], m_boundingBoxCorners[7]);
+        SetLinePositions(lineIndex++, m_boundingBoxCorners[6], m_boundingBoxCorners[7]);
+        
+        SetLinePositions(lineIndex++, m_boundingBoxCorners[0], m_boundingBoxCorners[4]);
+        SetLinePositions(lineIndex++, m_boundingBoxCorners[1], m_boundingBoxCorners[5]);
+        SetLinePositions(lineIndex++, m_boundingBoxCorners[2], m_boundingBoxCorners[6]);
+        SetLinePositions(lineIndex++, m_boundingBoxCorners[3], m_boundingBoxCorners[7]);
+    }
+    
+    private void SetLinePositions(int index, Vector3 start, Vector3 end)
+    {
+        m_lineRenderers[index].SetPosition(0, start);
+        m_lineRenderers[index].SetPosition(1, end);
     }
 }

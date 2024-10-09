@@ -9,7 +9,10 @@ public class VideoControlsController : MonoBehaviour
 	private GameObject m_camera;
 	private VoxelVideoPlayer m_player;
 
-	private const float OFFSET = 0.05f;
+	private const float OFFSET = 0.1f;
+
+	private float m_targetAngle = 0.0f;
+	private float m_angle = 0.0f;
 
 	//-------------------------//
 
@@ -70,34 +73,76 @@ public class VideoControlsController : MonoBehaviour
 			Debug.LogWarning("Video controls parent does not have VoxelVideoPlayer behavior");
 			return;
 		}
+
+		Update();
+		m_angle = m_targetAngle;
 	}
 
 	private void Update()
 	{
+	    //if camera not found, set default position:
+	    //-----------------
 		if(m_camera == null)
 		{
-			float yBase = -0.5f - OFFSET;
-			float zBase =  0.5f + OFFSET;
-			transform.localPosition = new Vector3(0.0f, yBase, zBase);
+			transform.localPosition = new Vector3(0.0f, -0.5f - OFFSET, 0.5f + OFFSET);
+			transform.localEulerAngles = new Vector3(0.0f, 0.0f, 0.0f);
+			transform.localScale = Vector3.one;
+			transform.localScale = new Vector3 (1.0f / transform.lossyScale.x, 1.0f / transform.lossyScale.y, 1.0f / transform.lossyScale.z);
+		
 			return;
 		}
 
+	    //calculate target angle:
+	    //-----------------
 		Vector3 dist = m_camera.transform.position - transform.parent.position;
 		dist.y = 0.0f;
 		dist.Normalize();
 
-		float angle = Vector3.Angle(dist, new Vector3(0.0f, 0.0f, 1.0f));
+		m_targetAngle = Vector3.Angle(dist, new Vector3(0.0f, 0.0f, 1.0f));
 		if(dist.x < 0.0f)
-			angle = 360.0f - angle;
-		angle -= transform.parent.eulerAngles.y;
-		angle += 45.0f;
-		angle -= angle % 90.0f;
+			m_targetAngle = 360.0f - m_targetAngle;
+		m_targetAngle -= transform.parent.eulerAngles.y;
+		m_targetAngle += 45.0f;
+		m_targetAngle -= m_targetAngle % 90.0f;
 
-		float x = Mathf.Sin(angle * Mathf.Deg2Rad);
+		Debug.Log(m_targetAngle);
+
+		m_targetAngle = (m_targetAngle + 360.0f) % 360.0f;		
+
+	    //update angle:
+	    //-----------------
+		float angleDiff = (m_targetAngle - m_angle) % 360.0f;
+		if (angleDiff < -180.0f)
+			angleDiff += 360.0f;
+		else if (angleDiff > 180.0f)
+			angleDiff -= 360.0f;
+	
+		m_angle += angleDiff * (1.0f - Mathf.Pow(0.975f, 1000.0f * Time.deltaTime));
+		m_angle = (m_angle + 360.0f) % 360.0f;
+	    
+		//calculate position:
+	    //-----------------
+		float x = Mathf.Sin(m_angle * Mathf.Deg2Rad) * (0.5f + OFFSET);
 		float y = -0.5f - OFFSET;
-		float z = Mathf.Cos(angle * Mathf.Deg2Rad);
+		float z = Mathf.Cos(m_angle * Mathf.Deg2Rad) * (0.5f + OFFSET);
 
-		transform.localPosition = new Vector3(x, y, z);
-		transform.localEulerAngles = new Vector3(0.0f, angle, 0.0f);
+		Vector3Int videoSize;
+		if(m_player != null)
+			videoSize = m_player.GetVideoResolution();
+		else
+			videoSize = new Vector3Int(1, 1, 1);
+
+		int maxSize = Math.Max(Math.Max(videoSize.x, videoSize.y), videoSize.z);
+
+		Vector3 position = new Vector3(x, y, z);
+		position.x *= (float)videoSize.x / maxSize;
+		position.z *= (float)videoSize.z / maxSize;
+
+	    //set transform:
+	    //-----------------
+		transform.localPosition = position;
+		transform.localEulerAngles = new Vector3(0.0f, m_angle, 0.0f);
+		transform.localScale = Vector3.one;
+		transform.localScale = new Vector3 (1.0f / transform.lossyScale.x, 1.0f / transform.lossyScale.y, 1.0f / transform.lossyScale.z);
 	}
 }
