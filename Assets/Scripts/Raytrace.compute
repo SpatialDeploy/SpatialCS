@@ -7,6 +7,17 @@
 
 #define EPSILON 0.0001
 
+#define BRICK_SIZE 5 //TODO: change to 8 (using 5 to test sphere.vdb)
+#define EMPTY_BRICK 0xFFFFFFFF
+
+//-------------------------//
+
+struct Brick
+{
+	uint bitmap[((BRICK_SIZE * BRICK_SIZE * BRICK_SIZE + 31) & (~31)) / 32];
+	uint colors[BRICK_SIZE * BRICK_SIZE * BRICK_SIZE];
+};
+
 //-------------------------//
 
 RWTexture2D<float4> u_outTexture;
@@ -17,9 +28,9 @@ float4x4 u_invModel;
 float4x4 u_invView;
 float4x4 u_invProj;
 
-uint3 u_volumeSize;
-StructuredBuffer<uint> u_voxelBitmap;
-StructuredBuffer<uint> u_voxelData;
+uint3 u_mapSize;
+StructuredBuffer<uint> u_map;
+StructuredBuffer<Brick> u_bricks;
 
 Texture2D<float4> u_srcDepthTexture;
 Texture2D<float4> u_srcColorTexture;
@@ -47,26 +58,58 @@ float3 background_color(float2 uv)
 	return u_srcColorTexture.SampleLevel(sampleru_srcColorTexture, uv, 0).xyz;
 }
 
-//-------------------------//
-
-bool in_bounds(uint3 pos)
+void iterate_dda(float3 deltaDist, int3 step, inout float3 sideDist, inout uint3 pos, out float3 lastSideDist)
 {
-	return pos.x < u_volumeSize.x && pos.y < u_volumeSize.y && pos.z < u_volumeSize.z;
+	lastSideDist = sideDist;
+
+	if(sideDist.x < sideDist.y)
+	{
+		if(sideDist.x < sideDist.z)
+		{
+			sideDist.x += deltaDist.x;
+			pos.x += (uint)step.x;
+		}
+		else
+		{
+			sideDist.z += deltaDist.z;
+			pos.z += (uint)step.z;
+		}
+	}
+	else
+	{
+		if(sideDist.y < sideDist.z)
+		{
+			sideDist.y += deltaDist.y;
+			pos.y += (uint)step.y;
+		}
+		else
+		{
+			sideDist.z += deltaDist.z;
+			pos.z += (uint)step.z;
+		}
+	}
 }
 
-bool voxel_exists(uint3 pos)
+//-------------------------//
+
+bool in_brick_bounds(uint3 pos)
 {
-	uint idx = pos.x + u_volumeSize.x * (pos.y + u_volumeSize.y * pos.z);
+	return pos.x < BRICK_SIZE && pos.y < BRICK_SIZE && pos.z < BRICK_SIZE;
+}
+
+uint voxel_exists(uint brick, uint3 pos)
+{
+	uint idx = pos.x + BRICK_SIZE * (pos.y + BRICK_SIZE * pos.z);
 	uint arrIdx = idx / 32;
 	uint bitIdx = idx % 32;
 
-	return (u_voxelBitmap[arrIdx] & (1u << bitIdx)) != 0;
+	return (u_bricks[brick].bitmap[arrIdx] & (1 << bitIdx)) != 0;
 }
 
-float3 get_voxel_color(uint3 pos)
+float3 get_voxel_color(uint brick, uint3 pos)
 {
-	uint idx = pos.x + u_volumeSize.x * (pos.y + u_volumeSize.y * pos.z);
-	uint packedColor = u_voxelData[idx];
+	uint idx = pos.x + BRICK_SIZE * (pos.y + BRICK_SIZE * pos.z);
+	uint packedColor = u_bricks[brick].colors[idx];
 
 	uint r = (packedColor >> 24) & 0xFF;
 	uint g = (packedColor >> 16) & 0xFF;
@@ -75,19 +118,76 @@ float3 get_voxel_color(uint3 pos)
 	return float3((float)r / 255.0, (float)g / 255.0, (float)b / 255.0);
 }
 
-struct IntersectVolumeOut
+struct IntersectBrickOut
 {
 	bool hit;
 	float3 color;
 	float3 hitPos;
 };
 
-//simple DDA voxel traversal algorithm
-//http://www.cse.yorku.ca/~amana/research/grid.pdf
-//https://www.shadertoy.com/view/4dX3zl
-IntersectVolumeOut intersect_volume(float3 rayPos, float3 rayDir, float3 invRayDir)
+IntersectBrickOut intersect_brick(uint brick, float3 rayPos, float3 rayDir, float3 deltaDist, int3 step)
 {
-	rayPos *= float3(u_volumeSize);
+	rayPos *= float3(BRICK_SIZE, BRICK_SIZE, BRICK_SIZE);
+
+	uint3 pos = uint3(floor(rayPos));
+	float3 sideDist = (sign(rayDir) * (float3(pos) - rayPos) + (sign(rayDir) * 0.5) + 0.5) * deltaDist;
+	float3 lastSideDist = float3(0.0, 0.0, 0.0);
+
+	bool hit = false;
+	while(in_brick_bounds(pos))
+	{
+		if(voxel_exists(brick, pos))
+		{
+			hit = true;
+			break;
+		}
+
+		iterate_dda(deltaDist, step, sideDist, pos, lastSideDist);
+	}
+
+	IntersectBrickOut retval;
+	retval.hit = hit;
+
+	if(hit)
+	{
+		retval.color = get_voxel_color(brick, pos);
+
+		float3 hitPos = rayPos + rayDir * min(min(lastSideDist.x, lastSideDist.y), lastSideDist.z);
+		hitPos /= float3(BRICK_SIZE, BRICK_SIZE, BRICK_SIZE);
+		retval.hitPos = hitPos;
+	}
+	else
+	{
+		retval.color = float3(0.0, 0.0, 0.0);
+		retval.hitPos = float3(0.0, 0.0, 0.0);
+	}
+
+	return retval;
+}
+
+//-------------------------//
+
+bool in_map_bounds(uint3 pos)
+{
+	return pos.x < u_mapSize.x && pos.y < u_mapSize.y && pos.z < u_mapSize.z;
+}
+
+uint get_brick(uint3 pos)
+{
+	uint idx = pos.x + u_mapSize.x * (pos.y + u_mapSize.y * pos.z);
+	return u_map[idx];
+}
+
+struct IntersectMapOut
+{
+	bool hit;
+	float3 color;
+	float3 hitPos;
+};
+
+IntersectMapOut intersect_map(float3 rayPos, float3 rayDir, float3 invRayDir)
+{
+	rayPos *= float3(u_mapSize);
 
 	uint3 mapPos = uint3(floor(rayPos));
 	float3 deltaDist = abs(invRayDir);
@@ -95,55 +195,35 @@ IntersectVolumeOut intersect_volume(float3 rayPos, float3 rayDir, float3 invRayD
 	float3 sideDist = (sign(rayDir) * (float3(mapPos) - rayPos) + (sign(rayDir) * 0.5) + 0.5) * deltaDist;
 	float3 lastSideDist = float3(0.0, 0.0, 0.0);
 
+	IntersectBrickOut brickHit;
+
 	bool hit = false;
-	while(in_bounds(mapPos))
+	while(in_map_bounds(mapPos))
 	{
-		if(voxel_exists(mapPos))
+		uint brick = get_brick(mapPos);
+		if(brick != EMPTY_BRICK)
 		{
-			hit = true;
-			break;
+			float3 curRayPos = rayPos + rayDir * (min(min(lastSideDist.x, lastSideDist.y), lastSideDist.z) + EPSILON);
+			curRayPos -= float3(mapPos);
+
+			brickHit = intersect_brick(brick, curRayPos, rayDir, deltaDist, step);
+			if(brickHit.hit)
+			{
+				hit = true;
+				break;
+			}
 		}
 
-		lastSideDist = sideDist;
-
-		if(sideDist.x < sideDist.y)
-		{
-			if(sideDist.x < sideDist.z)
-			{
-				sideDist.x += deltaDist.x;
-				mapPos.x += (uint)step.x;
-			}
-			else
-			{
-				sideDist.z += deltaDist.z;
-				mapPos.z += (uint)step.z;
-			}
-		}
-		else
-		{
-			if(sideDist.y < sideDist.z)
-			{
-				sideDist.y += deltaDist.y;
-				mapPos.y += (uint)step.y;
-			}
-			else
-			{
-				sideDist.z += deltaDist.z;
-				mapPos.z += (uint)step.z;
-			}
-		}
+		iterate_dda(deltaDist, step, sideDist, mapPos, lastSideDist);
 	}
 
-	IntersectVolumeOut retval;
+	IntersectMapOut retval;
 	retval.hit = hit;
 
 	if(hit)
 	{
-		retval.color = get_voxel_color(mapPos);
-
-		float3 hitPos = rayPos + rayDir * min(min(lastSideDist.x, lastSideDist.y), lastSideDist.z);
-		hitPos /= float3(u_volumeSize);
-		retval.hitPos = hitPos;
+		retval.color = brickHit.color;
+		retval.hitPos = float3(mapPos) / float3(u_mapSize) + float3(brickHit.hitPos) / float3(BRICK_SIZE, BRICK_SIZE, BRICK_SIZE);
 	}
 	else
 	{
@@ -194,9 +274,9 @@ void main(uint3 id : SV_DispatchThreadID)
 
 	//check for intersection with bounding cube:
 	//---------------
-    uint maxSize = max(max(u_volumeSize.x, u_volumeSize.y), u_volumeSize.z);
-	float3 volumeMin = -float3(u_volumeSize) / (float)maxSize / 2.0;
-	float3 volumeMax =  float3(u_volumeSize) / (float)maxSize / 2.0; 
+    uint maxSize = max(max(u_mapSize.x, u_mapSize.y), u_mapSize.z);
+	float3 volumeMin = -float3(u_mapSize) / (float)maxSize / 2.0;
+	float3 volumeMax =  float3(u_mapSize) / (float)maxSize / 2.0; 
 
 	float2 intersect = intersect_aabb(volumeMin, volumeMax, rayPos, invRayDir);
 
@@ -214,7 +294,7 @@ void main(uint3 id : SV_DispatchThreadID)
 		startRayPos -= volumeMin;
 		startRayPos /= (volumeMax - volumeMin);
 
-		IntersectVolumeOut result = intersect_volume(startRayPos, rayDir, invRayDir);
+		IntersectMapOut result = intersect_map(startRayPos, rayDir, invRayDir);
 
 		if(result.hit)
 		{

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Defective.JSON;
 using UnityEngine;
@@ -74,7 +75,7 @@ public class VoxelVideoPlayer : MonoBehaviour
     public Vector3Int GetVideoResolution()
     {
         if(m_video == null)
-            return new Vector3Int(0, 0, 0);
+            return new Vector3Int(1, 1, 1);
 
         return new Vector3Int(m_video.size.x, m_video.size.z, m_video.size.y);
     }
@@ -101,12 +102,14 @@ public class VoxelVideoPlayer : MonoBehaviour
 
         //load video:
 	    //-----------------
-        m_video = LoadVoxelVideo("Videos/cake");
+        m_video = LoadVoxelVideo("Videos/Coates");
         if(m_video == null)
         {
             Debug.LogWarning("Failed to load voxel video file");
             return;
         }
+
+        m_video.size = new Vector3Int(125, 125, 125); //TEMP!!!
 
         //setup video playback params:
 	    //-----------------
@@ -114,7 +117,7 @@ public class VoxelVideoPlayer : MonoBehaviour
         m_curTime = 0.0f;
         m_curFrame = 0;
 
-        m_curVolume = Raytracer.CreateVolume(m_video.size, m_video.frames[m_curFrame]);
+        m_curVolume = Raytracer.CreateVolume(m_video.size, File.ReadAllBytes("Assets/Resources/Videos/out.bin")); //TEMP!!!
         m_raytracer.SetCurrentVolume(m_curVolume);
 
         //setup bounding box rendering:
@@ -142,7 +145,7 @@ public class VoxelVideoPlayer : MonoBehaviour
             if(m_curVolume != null)
                 Raytracer.DestroyVolume(m_curVolume);
 
-            m_curVolume = Raytracer.CreateVolume(m_video.size, m_video.frames[frame]);
+            m_curVolume = Raytracer.CreateVolume(m_video.size, File.ReadAllBytes("Assets/Resources/Videos/out.bin")); //TEMP!!!
             m_raytracer.SetCurrentVolume(m_curVolume);
             m_curFrame = frame;
         }
@@ -166,7 +169,7 @@ public class VoxelVideoPlayer : MonoBehaviour
         //-----------------	
         VoxelVideo video = new VoxelVideo();
 
-        TextAsset asset = Resources.Load<TextAsset>("Videos/cake");
+        TextAsset asset = Resources.Load<TextAsset>(name);
         JSONObject videoObject = new JSONObject(asset.ToString());
 
         //ensure all top-level fields exist:

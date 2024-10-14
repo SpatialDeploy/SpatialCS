@@ -105,8 +105,6 @@ public class VideoControlsController : MonoBehaviour
 		m_targetAngle += 45.0f;
 		m_targetAngle -= m_targetAngle % 90.0f;
 
-		Debug.Log(m_targetAngle);
-
 		m_targetAngle = (m_targetAngle + 360.0f) % 360.0f;		
 
 	    //update angle:

@@ -1,7 +1,5 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Data;
+using System.IO;
 using UnityEngine;
 
 //-------------------------//
@@ -9,8 +7,11 @@ using UnityEngine;
 public class VoxelVolume
 {
 	public Vector3Int size;
-	public ComputeBuffer bitmapBuf;
-	public ComputeBuffer voxelDataBuf;
+	public Vector3Int sizeMap;
+
+
+	public ComputeBuffer mapBuf;
+	public ComputeBuffer brickBuf;
 };
 
 //-------------------------//
@@ -20,6 +21,7 @@ public class Raytracer : MonoBehaviour
 {
 	private const int WORKGROUP_SIZE_X = 8;
 	private const int WORKGROUP_SIZE_Y = 8;
+	private const int BRICK_SIZE = 5; //TODO: change to 8 (using 5 just to test sphere.vdb)
 	
 	[SerializeField]
 	private ComputeShader m_shader = null;
@@ -39,55 +41,34 @@ public class Raytracer : MonoBehaviour
 
 	//-------------------------//
 
-	public static VoxelVolume CreateVolume(Vector3Int size, string[] voxels)
+	public static VoxelVolume CreateVolume(Vector3Int size, byte[] brickmap)
 	{
-		VoxelVolume volume = new VoxelVolume();
-		volume.size = new Vector3Int(size.x, size.z, size.y);
-		
-		int bitmapSize = volume.size.x * volume.size.y * volume.size.z;
-		bitmapSize = (bitmapSize + 31) & ~31; //align up to multiple of 32
-		bitmapSize /= 32; //32 bits per uint32
-		uint[] bitmap = new uint[bitmapSize];
-
-		int voxelDataSize = volume.size.x * volume.size.y * volume.size.z;
-		uint[] voxelData = new uint[voxelDataSize]; //1 uint32 per voxel (RGB color, 8 bits per component)
-
-		for(int z = 0; z < volume.size.z; z++)
-		for(int y = 0; y < volume.size.y; y++)
-		for(int x = 0; x < volume.size.x; x++)
+		if(size.x % BRICK_SIZE > 0 || size.y % BRICK_SIZE > 0 || size.z % BRICK_SIZE > 0)
 		{
-			int idx = x + volume.size.x * (y + volume.size.y * z);
-			int readIdx = x + volume.size.x * (z + volume.size.z * y);
-
-			string voxel = voxels[readIdx];
-			if(voxel != null)
-			{
-				bitmap[idx / 32] |= 1u << (idx % 32);
-
-				uint r = Convert.ToUInt32(voxel.Substring(1, 2), 16);
-				uint g = Convert.ToUInt32(voxel.Substring(3, 2), 16);
-				uint b = Convert.ToUInt32(voxel.Substring(5, 2), 16);
-				uint packedColor = (r << 24) | (g << 16) | (b << 8);
-
-				voxelData[idx] = packedColor;
-			}
-			else
-				bitmap[idx / 32] &= ~(1u << (idx % 32));
+			Debug.LogWarning("volume size is not a multiple of BRICK_SIZE");
+			return null;
 		}
 
-		volume.bitmapBuf = new ComputeBuffer(bitmapSize, sizeof(uint));
-		volume.bitmapBuf.SetData(bitmap);
+		VoxelVolume volume = new VoxelVolume();
+		volume.size = new Vector3Int(size.x, size.z, size.y);
+		volume.sizeMap = new Vector3Int(size.x / BRICK_SIZE, size.y / BRICK_SIZE, size.z / BRICK_SIZE);
 		
-		volume.voxelDataBuf = new ComputeBuffer(voxelDataSize, sizeof(uint));
-		volume.voxelDataBuf.SetData(voxelData);
+		int mapBufSize = volume.sizeMap.x * volume.sizeMap.y * volume.sizeMap.z * sizeof(uint);
+		int brickBufSize = brickmap.Length - mapBufSize;
+
+		volume.mapBuf = new ComputeBuffer(mapBufSize, sizeof(uint));
+		volume.mapBuf.SetData(brickmap, 0, 0, mapBufSize);
+
+		volume.brickBuf = new ComputeBuffer(brickBufSize, sizeof(uint));
+		volume.brickBuf.SetData(brickmap, mapBufSize, 0, brickBufSize);
 
 		return volume;
 	}
 
 	public static void DestroyVolume(VoxelVolume volume)
 	{
-		volume.bitmapBuf.Release();
-		volume.voxelDataBuf.Release();
+		volume.mapBuf.Release();
+		volume.brickBuf.Release();
 	}
 
 	//-------------------------//
@@ -146,10 +127,10 @@ public class Raytracer : MonoBehaviour
 		m_shader.SetMatrix("u_invView", m_camera.cameraToWorldMatrix);
 		m_shader.SetMatrix("u_invProj", m_camera.projectionMatrix.inverse);
 
-		int[] volumeSize = {m_curVolume.size.x, m_curVolume.size.y, m_curVolume.size.z}; //temp
-		m_shader.SetInts("u_volumeSize", volumeSize);
-		m_shader.SetBuffer(0, "u_voxelBitmap", m_curVolume.bitmapBuf);
-		m_shader.SetBuffer(0, "u_voxelData", m_curVolume.voxelDataBuf);
+		int[] mapSize = {m_curVolume.sizeMap.x, m_curVolume.sizeMap.y, m_curVolume.sizeMap.z};
+		m_shader.SetInts("u_mapSize", mapSize);
+		m_shader.SetBuffer(0, "u_map", m_curVolume.mapBuf);
+		m_shader.SetBuffer(0, "u_bricks", m_curVolume.brickBuf);
 
 		//TODO: in forward rendering mode the "_CameraDepthTexture" seems to lag one frame behind
 		//figure out how to fix this in case we don't want to use deferred rendering
