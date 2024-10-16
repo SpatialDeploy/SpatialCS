@@ -29,6 +29,8 @@ public class VoxelVideoPlayer : MonoBehaviour
     private Raytracer m_raytracer = null;
     private VoxelVolume m_curVolume = null;
 
+    [SerializeField]
+    private Material m_boundingBoxMaterial = null;
     private const float BOUNDING_BOX_WIDTH = 0.005f;
     private readonly Vector3[] m_boundingBoxCorners = new Vector3[8];
     private readonly LineRenderer[] m_lineRenderers = new LineRenderer[12];
@@ -230,6 +232,9 @@ public class VoxelVideoPlayer : MonoBehaviour
     {
         //create line renderers:
 	    //-----------------
+        if(m_boundingBoxMaterial == null)
+            m_boundingBoxMaterial = new Material(Shader.Find("Sprites/Default"));
+
         GameObject linesParent = new GameObject("BoundingBoxLines");
         linesParent.transform.SetParent(transform);
         for(int i = 0; i < 12; i++)
@@ -241,10 +246,10 @@ public class VoxelVideoPlayer : MonoBehaviour
             line.positionCount = 2;
             line.startWidth = BOUNDING_BOX_WIDTH;
             line.endWidth = BOUNDING_BOX_WIDTH;
-            line.material = new Material(Shader.Find("Sprites/Default"));
+            line.material = m_boundingBoxMaterial;
             line.startColor = Color.black;
             line.endColor = Color.black;
-            
+
             m_lineRenderers[i] = line;
         }
 

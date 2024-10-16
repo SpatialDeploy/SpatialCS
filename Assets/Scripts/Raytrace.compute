@@ -153,8 +153,7 @@ IntersectBrickOut intersect_brick(uint brick, float3 rayPos, float3 rayDir, floa
 		retval.color = get_voxel_color(brick, pos);
 
 		float3 hitPos = rayPos + rayDir * min(min(lastSideDist.x, lastSideDist.y), lastSideDist.z);
-		hitPos /= float3(BRICK_SIZE, BRICK_SIZE, BRICK_SIZE);
-		retval.hitPos = hitPos;
+		retval.hitPos = hitPos / float(BRICK_SIZE);
 	}
 	else
 	{
@@ -223,7 +222,8 @@ IntersectMapOut intersect_map(float3 rayPos, float3 rayDir, float3 invRayDir)
 	if(hit)
 	{
 		retval.color = brickHit.color;
-		retval.hitPos = float3(mapPos) / float3(u_mapSize) + float3(brickHit.hitPos) / float3(BRICK_SIZE, BRICK_SIZE, BRICK_SIZE);
+		retval.hitPos = float3(mapPos) * BRICK_SIZE + brickHit.hitPos;
+		retval.hitPos /= float3(u_mapSize * BRICK_SIZE);
 	}
 	else
 	{
