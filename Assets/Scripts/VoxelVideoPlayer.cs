@@ -119,7 +119,7 @@ public class VoxelVideoPlayer : MonoBehaviour
         m_curTime = 0.0f;
         m_curFrame = 0;
 
-        m_curVolume = Raytracer.CreateVolume(m_video.size, File.ReadAllBytes("Assets/Resources/Videos/out.bin")); //TEMP!!!
+        m_curVolume = Raytracer.CreateVolume(m_video.size, Resources.Load<TextAsset>("Videos/test_brickmap").bytes); //TEMP!!!
         m_raytracer.SetCurrentVolume(m_curVolume);
 
         //setup bounding box rendering:
@@ -147,7 +147,7 @@ public class VoxelVideoPlayer : MonoBehaviour
             if(m_curVolume != null)
                 Raytracer.DestroyVolume(m_curVolume);
 
-            m_curVolume = Raytracer.CreateVolume(m_video.size, File.ReadAllBytes("Assets/Resources/Videos/out.bin")); //TEMP!!!
+            m_curVolume = Raytracer.CreateVolume(m_video.size, Resources.Load<TextAsset>("Videos/test_brickmap").bytes); //TEMP!!!
             m_raytracer.SetCurrentVolume(m_curVolume);
             m_curFrame = frame;
         }
@@ -159,7 +159,8 @@ public class VoxelVideoPlayer : MonoBehaviour
 
     private void OnDestroy()
     {
-        m_raytracer.SetCurrentVolume(null);
+        if(m_raytracer != null)
+            m_raytracer.SetCurrentVolume(null);
 
         if(m_curVolume != null)
             Raytracer.DestroyVolume(m_curVolume);

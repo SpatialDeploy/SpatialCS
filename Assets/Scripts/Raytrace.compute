@@ -319,5 +319,6 @@ void main(uint3 id : SV_DispatchThreadID)
 
     //write final color:
 	//---------------
+	writePos.y = u_outTextureDims.y - writePos.y - 1; //flip vertically (to account for initial flip)
     u_outTexture[writePos] = float4(color, 1.0);
 }

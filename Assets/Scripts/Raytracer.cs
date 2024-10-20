@@ -83,7 +83,7 @@ public class Raytracer : MonoBehaviour
 	{
 		//dont render if no volume or shader is specified:
 		//-----------------	
-		if(m_shader == null || m_curVolume == null)
+		if(m_shader == null || m_curVolume == null || !SystemInfo.supportsComputeShaders)
 		{
 			Graphics.Blit(src, dst);
 			return;
@@ -151,8 +151,9 @@ public class Raytracer : MonoBehaviour
 
 	private void CreateOutputTexture(int width, int height)
 	{
-		m_outTexture = new RenderTexture(width, height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear);
+		m_outTexture = new RenderTexture(width, height, 0);
 		m_outTexture.enableRandomWrite = true;
+		m_outTexture.vrUsage = VRTextureUsage.TwoEyes;
 		m_outTexture.Create();
 	}
 
