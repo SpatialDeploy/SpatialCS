@@ -1757,6 +1757,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_shader: {fileID: 7200000, guid: 2f18aba30f6aa3241beb2900b1b2e54e, type: 3}
+  m_blitMaterial: {fileID: 2100000, guid: c52bdcf71362acd4fb62cde1869a7d09, type: 2}
   m_volumeObject: {fileID: 611285407}
 --- !u!114 &1003546334
 MonoBehaviour:
