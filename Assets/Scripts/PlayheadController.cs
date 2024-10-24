@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.XR.Interaction.Toolkit;
 
 [RequireComponent(typeof(Renderer), typeof(MeshFilter))]
 public class PlayheadController : MonoBehaviour
@@ -10,6 +11,8 @@ public class PlayheadController : MonoBehaviour
 
     private float minLocalX = 0.0f;
     private float maxLocalX = 1.0f;
+
+    private IXRSelectInteractor m_curInteractor = null;
 
     //-------------------------//
 
@@ -57,13 +60,10 @@ public class PlayheadController : MonoBehaviour
             m_material.SetFloat("_Threshold", m_controller.GetVideoProgess());
 
         m_controller.SetAdjustingProgess(false);
-        if(Input.GetMouseButton(0))
+        if(m_curInteractor != null && m_curInteractor is XRRayInteractor rayInteractor)
         {
-            Vector3 mousePos = Input.mousePosition;
-
-            Ray ray = Camera.main.ScreenPointToRay(mousePos);
             RaycastHit hit;
-            if(Physics.Raycast(ray, out hit))
+            if(rayInteractor.TryGetCurrent3DRaycastHit(out hit))
             {
                 if(hit.transform == transform)
                 {
@@ -76,5 +76,15 @@ public class PlayheadController : MonoBehaviour
                 }
             }
         }
+    }
+
+    public void OnSelect(SelectEnterEventArgs args)
+    {
+        m_curInteractor = args.interactorObject;
+    }
+
+    public void OnDeselect()
+    {
+        m_curInteractor = null;
     }
 }

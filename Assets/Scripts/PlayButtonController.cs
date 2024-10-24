@@ -4,13 +4,12 @@ using UnityEngine;
 
 //-------------------------//
 
-[RequireComponent(typeof(MeshRenderer), typeof(MeshFilter), typeof(MeshCollider))]
+[RequireComponent(typeof(MeshRenderer), typeof(MeshFilter))]
 public class PlayButtonController : MonoBehaviour
 {
     private VideoControlsController m_controller = null;
     private MeshRenderer m_meshRenderer = null;
     private MeshFilter m_meshFilter = null;
-    private MeshCollider m_meshCollider = null;
 
     [SerializeField]
     private Mesh m_playMesh = null;
@@ -43,7 +42,6 @@ public class PlayButtonController : MonoBehaviour
 
         m_meshRenderer = GetComponent<MeshRenderer>();
         m_meshFilter = GetComponent<MeshFilter>();
-        m_meshCollider = GetComponent<MeshCollider>();
 
         m_playing = m_controller.IsVideoPlaying();
         SetMesh();
@@ -67,17 +65,15 @@ public class PlayButtonController : MonoBehaviour
         {
             m_meshFilter.mesh = m_pauseMesh;
             m_meshRenderer.material = m_pauseMaterial;
-            m_meshCollider.sharedMesh = m_pauseMesh;
         }
         else
         {
             m_meshFilter.mesh = m_playMesh;
             m_meshRenderer.material = m_playMaterial;
-            m_meshCollider.sharedMesh = m_playMesh;
         }
     }
 
-    private void OnMouseDown()
+    public void OnSelect()
     {
         if(m_controller == null)
             return;
