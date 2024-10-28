@@ -34,6 +34,8 @@ public class VoxelVideoPlayer : MonoBehaviour
     private const float BOUNDING_BOX_WIDTH = 0.005f;
     private readonly Vector3[] m_boundingBoxCorners = new Vector3[8];
     private readonly LineRenderer[] m_lineRenderers = new LineRenderer[12];
+    private float m_targetLineWidth = 0.0f;
+    private float m_lineWidth = 0.0f;
 
     private float m_curTime = 0.0f;
     private int m_curFrame = 0;
@@ -111,7 +113,9 @@ public class VoxelVideoPlayer : MonoBehaviour
             return;
         }
 
-        m_video.size = new Vector3Int(125, 125, 125); //TEMP!!!
+	    //TEMP!!! JUST FOR DEMO
+        m_video.size = new Vector3Int(128, 128, 128);
+        m_video.duration = 2.5f;
 
         //setup video playback params:
 	    //-----------------
@@ -152,6 +156,8 @@ public class VoxelVideoPlayer : MonoBehaviour
             m_curFrame = frame;
         }
 
+        m_raytracer.SetCurrentTime(GetProgress());
+
 	    //draw bounding box:
 	    //-----------------
         DrawBoundingBox();
@@ -164,6 +170,16 @@ public class VoxelVideoPlayer : MonoBehaviour
 
         if(m_curVolume != null)
             Raytracer.DestroyVolume(m_curVolume);
+    }
+
+    public void OnHover()
+    {
+        m_targetLineWidth = BOUNDING_BOX_WIDTH;
+    }
+
+    public void OnUnHover()
+    {
+        m_targetLineWidth = 0.0f;
     }
 
     private VoxelVideo LoadVoxelVideo(string name)
@@ -231,10 +247,20 @@ public class VoxelVideoPlayer : MonoBehaviour
     }
     private void SetupBoundingBox()
     {
+        //init variables:
+	    //-----------------
+        m_targetLineWidth = 0.0f;
+        m_lineWidth = m_targetLineWidth;
+
         //create line renderers:
 	    //-----------------
         if(m_boundingBoxMaterial == null)
             m_boundingBoxMaterial = new Material(Shader.Find("Sprites/Default"));
+        else
+        {
+            m_boundingBoxMaterial = new Material(m_boundingBoxMaterial);
+            m_boundingBoxMaterial.SetColor("_Color", Color.black);
+        }
 
         GameObject linesParent = new GameObject("BoundingBoxLines");
         linesParent.transform.SetParent(transform);
@@ -245,8 +271,8 @@ public class VoxelVideoPlayer : MonoBehaviour
             
             LineRenderer line = lineObj.AddComponent<LineRenderer>();
             line.positionCount = 2;
-            line.startWidth = BOUNDING_BOX_WIDTH;
-            line.endWidth = BOUNDING_BOX_WIDTH;
+            line.startWidth = m_lineWidth;
+            line.endWidth = m_lineWidth;
             line.material = m_boundingBoxMaterial;
             line.startColor = Color.black;
             line.endColor = Color.black;
@@ -277,6 +303,18 @@ public class VoxelVideoPlayer : MonoBehaviour
     
     private void DrawBoundingBox()
     {
+        //set line widths:
+	    //-----------------
+		m_lineWidth += (m_targetLineWidth - m_lineWidth) * (1.0f - Mathf.Pow(0.975f, 1000.0f * Time.deltaTime));
+
+        for(int i = 0; i < m_lineRenderers.Length; i++)
+        {
+            m_lineRenderers[i].startWidth = m_lineWidth;
+            m_lineRenderers[i].endWidth = m_lineWidth;
+        }
+
+        //set line positions:
+	    //-----------------
         int lineIndex = 0;
         
         SetLinePositions(lineIndex++, m_boundingBoxCorners[0], m_boundingBoxCorners[1]);

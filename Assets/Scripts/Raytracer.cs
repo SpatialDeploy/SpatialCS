@@ -21,7 +21,7 @@ public class Raytracer : MonoBehaviour
 {
 	private const int WORKGROUP_SIZE_X = 8;
 	private const int WORKGROUP_SIZE_Y = 8;
-	private const int BRICK_SIZE = 5; //TODO: change to 8 (using 5 just to test sphere.vdb)
+	private const int BRICK_SIZE = 8;
 	
 	[SerializeField]
 	private ComputeShader m_shader = null;
@@ -32,11 +32,20 @@ public class Raytracer : MonoBehaviour
 
 	private VoxelVolume m_curVolume = null;
 
+	//TEMP!!! JUST FOR DEMO
+	private float m_time = 0.0f;
+
 	//-------------------------//
 
 	public void SetCurrentVolume(VoxelVolume volume)
 	{
 		m_curVolume = volume;
+	}
+
+	//TEMP!!! JUST FOR DEMO
+	public void SetCurrentTime(float t)
+	{
+		m_time = t;
 	}
 
 	//-------------------------//
@@ -131,6 +140,9 @@ public class Raytracer : MonoBehaviour
 		m_shader.SetInts("u_mapSize", mapSize);
 		m_shader.SetBuffer(0, "u_map", m_curVolume.mapBuf);
 		m_shader.SetBuffer(0, "u_bricks", m_curVolume.brickBuf);
+
+		//TEMP!!! JUST FOR DEMO
+		m_shader.SetFloat("u_time", m_time);
 
 		//TODO: in forward rendering mode the "_CameraDepthTexture" seems to lag one frame behind
 		//figure out how to fix this in case we don't want to use deferred rendering
