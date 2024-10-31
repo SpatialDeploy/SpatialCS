@@ -5,6 +5,8 @@ using System.IO;
 using System.Linq;
 using Defective.JSON;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 //-------------------------//
 
@@ -25,8 +27,9 @@ public class VoxelVideo
 
 public class VoxelVideoPlayer : MonoBehaviour
 {
+    [SerializeField]
+    private VolumeRendererFeature m_renderFeature;
     private VoxelVideo m_video = null;
-    private Raytracer m_raytracer = null;
     private VoxelVolume m_curVolume = null;
 
     [SerializeField]
@@ -88,22 +91,6 @@ public class VoxelVideoPlayer : MonoBehaviour
 
     private void Start()
     {
-        //get raytracer:
-	    //-----------------
-        Camera camera = Camera.main;
-        if(camera == null)
-        {
-            Debug.LogWarning("Failed to find main camera");
-            return;
-        }
-
-        m_raytracer = camera.GetComponent<Raytracer>();
-        if(m_raytracer == null)
-        {
-            Debug.LogWarning("Main camera does not have Raytracer behavior");
-            return;
-        }
-
         //load video:
 	    //-----------------
         m_video = LoadVoxelVideo("Videos/Coates");
@@ -123,8 +110,8 @@ public class VoxelVideoPlayer : MonoBehaviour
         m_curTime = 0.0f;
         m_curFrame = 0;
 
-        m_curVolume = Raytracer.CreateVolume(m_video.size, Resources.Load<TextAsset>("Videos/test_brickmap").bytes); //TEMP!!!
-        m_raytracer.SetCurrentVolume(m_curVolume);
+        m_curVolume = VolumeRendererFeature.CreateVolume(m_video.size, Resources.Load<TextAsset>("Videos/test_brickmap").bytes); //TEMP!!!
+        m_renderFeature.SetCurrentVolume(m_curVolume);
 
         //setup bounding box rendering:
 	    //-----------------
@@ -135,7 +122,7 @@ public class VoxelVideoPlayer : MonoBehaviour
     {
         //skip if video wasnt loaded or raytracer wasnt found:
 	    //-----------------
-        if(m_video == null || m_raytracer == null)
+        if(m_video == null || m_renderFeature == null)
             return;
 
 	    //update video frame if necessary:
@@ -149,14 +136,14 @@ public class VoxelVideoPlayer : MonoBehaviour
         if(m_curFrame != frame)
         {
             if(m_curVolume != null)
-                Raytracer.DestroyVolume(m_curVolume);
+                VolumeRendererFeature.DestroyVolume(m_curVolume);
 
-            m_curVolume = Raytracer.CreateVolume(m_video.size, Resources.Load<TextAsset>("Videos/test_brickmap").bytes); //TEMP!!!
-            m_raytracer.SetCurrentVolume(m_curVolume);
+            m_curVolume = VolumeRendererFeature.CreateVolume(m_video.size, Resources.Load<TextAsset>("Videos/test_brickmap").bytes); //TEMP!!!
+            m_renderFeature.SetCurrentVolume(m_curVolume);
             m_curFrame = frame;
         }
 
-        m_raytracer.SetCurrentTime(GetProgress());
+        m_renderFeature.SetCurrentTime(GetProgress());
 
 	    //draw bounding box:
 	    //-----------------
@@ -165,11 +152,11 @@ public class VoxelVideoPlayer : MonoBehaviour
 
     private void OnDestroy()
     {
-        if(m_raytracer != null)
-            m_raytracer.SetCurrentVolume(null);
+        if(m_renderFeature != null)
+            m_renderFeature.SetCurrentVolume(null);
 
         if(m_curVolume != null)
-            Raytracer.DestroyVolume(m_curVolume);
+            VolumeRendererFeature.DestroyVolume(m_curVolume);
     }
 
     public void OnHover()
