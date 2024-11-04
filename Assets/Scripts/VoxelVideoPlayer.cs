@@ -1,26 +1,25 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Data.SqlTypes;
 using System.IO;
 using System.Linq;
 using Defective.JSON;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.VFX;
 
 //-------------------------//
 
 public class VoxelVideo
 {
-    public int version;
-    public string title;
-
+    public Vector3Int size;
     public float framerate;
-    public int numFrames;
+    public int framecount;
     public float duration;
     
-    public Vector3Int size;
-    public string[][] frames;
+    public byte[][] frames;
 };
 
 //-------------------------//
@@ -93,16 +92,12 @@ public class VoxelVideoPlayer : MonoBehaviour
     {
         //load video:
 	    //-----------------
-        m_video = LoadVoxelVideo("Videos/Coates");
+        m_video = LoadVoxelVideo("Videos/test_video");
         if(m_video == null)
         {
             Debug.LogWarning("Failed to load voxel video file");
             return;
         }
-
-	    //TEMP!!! JUST FOR DEMO
-        m_video.size = new Vector3Int(128, 128, 128);
-        m_video.duration = 2.5f;
 
         //setup video playback params:
 	    //-----------------
@@ -110,7 +105,7 @@ public class VoxelVideoPlayer : MonoBehaviour
         m_curTime = 0.0f;
         m_curFrame = 0;
 
-        m_curVolume = VolumeRendererFeature.CreateVolume(m_video.size, Resources.Load<TextAsset>("Videos/test_brickmap").bytes); //TEMP!!!
+        m_curVolume = VolumeRendererFeature.CreateVolume(m_video.size, m_video.frames[0]);
         m_renderFeature.SetCurrentVolume(m_curVolume);
 
         //setup bounding box rendering:
@@ -131,19 +126,17 @@ public class VoxelVideoPlayer : MonoBehaviour
             m_curTime += Time.deltaTime;
 
         int frame = (int)(m_curTime * m_video.framerate);
-        frame %= m_video.numFrames;
+        frame %= m_video.framecount;
 
         if(m_curFrame != frame)
         {
             if(m_curVolume != null)
                 VolumeRendererFeature.DestroyVolume(m_curVolume);
 
-            m_curVolume = VolumeRendererFeature.CreateVolume(m_video.size, Resources.Load<TextAsset>("Videos/test_brickmap").bytes); //TEMP!!!
+            m_curVolume = VolumeRendererFeature.CreateVolume(m_video.size, m_video.frames[frame]);
             m_renderFeature.SetCurrentVolume(m_curVolume);
             m_curFrame = frame;
         }
-
-        m_renderFeature.SetCurrentTime(GetProgress());
 
 	    //draw bounding box:
 	    //-----------------
@@ -171,64 +164,42 @@ public class VoxelVideoPlayer : MonoBehaviour
 
     private VoxelVideo LoadVoxelVideo(string name)
     {
-        //load into json object:
+        //load into byte array and create binary reader:
         //-----------------	
-        VoxelVideo video = new VoxelVideo();
+        byte[] rawData = Resources.Load<TextAsset>(name).bytes;
 
-        TextAsset asset = Resources.Load<TextAsset>(name);
-        JSONObject videoObject = new JSONObject(asset.ToString());
+        MemoryStream memoryStream = new MemoryStream(rawData);
+        BinaryReader reader = new BinaryReader(memoryStream);
 
-        //ensure all top-level fields exist:
+        //read metadata:
         //-----------------	
-        if(!videoObject.HasField("Title")      ||
-           !videoObject.HasField("Version")    ||
-           !videoObject.HasField("Framerate")  ||
-           !videoObject.HasField("Framecount") ||
-           !videoObject.HasField("Duration")   ||
-           !videoObject.HasField("Dimensions") ||
-           !videoObject.HasField("Blocks"))
-        {
-            return null;
-        }
+        uint width = reader.ReadUInt32();
+        uint height = reader.ReadUInt32();
+        uint depth = reader.ReadUInt32();
+        float framerate = reader.ReadSingle();
+        uint framecount = reader.ReadUInt32();
+        float duration = reader.ReadSingle();
 
-        //load top-level fields:
+        //copy each frame into frame array:
         //-----------------	
-        video.title = videoObject.GetField("Title").stringValue;
-        video.version = videoObject.GetField("Version").intValue;
-        video.framerate = videoObject.GetField("Framerate").floatValue;
-        video.numFrames = videoObject.GetField("Framecount").intValue;
-        video.duration = videoObject.GetField("Duration").floatValue;
-
-        //load dimensions:
-        //-----------------	
-        JSONObject dimObject = videoObject.GetField("Dimensions");
-        if(!dimObject.HasField("x") || !dimObject.HasField("y") || !dimObject.HasField("z"))
-            return null;
-        video.size = new Vector3Int(
-            dimObject.GetField("x").intValue,
-            dimObject.GetField("y").intValue,
-            dimObject.GetField("z").intValue
-        );
+        byte[][] frames = new byte[framecount][];
         
-        //load blocks:
-        //-----------------	
-        JSONObject blocksObject = videoObject.GetField("Blocks");
-        if(blocksObject.list.Count != video.numFrames)
-            return null;
-
-        int voxelsPerFrame = video.size.x * video.size.y * video.size.z;
-
-        video.frames = new string[video.numFrames][];
-        for(int i = 0; i < video.numFrames; i++)
+        for(uint i = 0; i < framecount; i++)
         {
-            JSONObject frameObject = blocksObject.list[i];
-            if(frameObject.list.Count < voxelsPerFrame)
-                return null;
-
-            video.frames[i] = new string[voxelsPerFrame];
-            for(int j = 0; j < voxelsPerFrame; j++)
-                video.frames[i][j] = frameObject.list[j].stringValue;
+            uint frameSize = reader.ReadUInt32();
+            frames[i] = reader.ReadBytes((int)frameSize);
         }
+
+        //create video struct and return:
+        //-----------------	
+        VoxelVideo video = new()
+        {
+            size = new Vector3Int((int)width, (int)height, (int)depth),
+            framerate = framerate,
+            framecount = (int)framecount,
+            duration = duration,
+            frames = frames
+        };
 
         return video;
     }

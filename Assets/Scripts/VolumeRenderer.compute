@@ -8,15 +8,11 @@
 #define EPSILON 0.0001
 
 #define BRICK_SIZE 8
+#define BRICK_BITMAP_LEN (((BRICK_SIZE * BRICK_SIZE * BRICK_SIZE + 31) & (~31)) / 32)
+#define BRICK_COLORS_LEN (BRICK_SIZE * BRICK_SIZE * BRICK_SIZE)
+#define BRICK_STRIDE (BRICK_BITMAP_LEN + BRICK_COLORS_LEN)
+
 #define EMPTY_BRICK 0xFFFFFFFF
-
-//-------------------------//
-
-struct Brick
-{
-	uint bitmap[((BRICK_SIZE * BRICK_SIZE * BRICK_SIZE + 31) & (~31)) / 32];
-	uint colors[BRICK_SIZE * BRICK_SIZE * BRICK_SIZE];
-};
 
 //-------------------------//
 
@@ -28,12 +24,9 @@ float4x4 u_invModel;
 float4x4 u_invView;
 float4x4 u_invProj;
 
-//TEMP!!! JUST FOR DEMO
-float u_time;
-
 uint3 u_mapSize;
 StructuredBuffer<uint> u_map;
-StructuredBuffer<Brick> u_bricks;
+StructuredBuffer<uint> u_bricks;
 
 Texture2D<float4> u_srcDepthTexture;
 Texture2D<float4> u_srcColorTexture;
@@ -95,24 +88,6 @@ void iterate_dda(float3 deltaDist, int3 step, inout float3 sideDist, inout uint3
 
 //-------------------------//
 
-//TEMP!! JUST FOR DEMO
-
-float3 sphere_pos()
-{
-	const float PI = 3.14159;
-
-	return float3(0.0, cos(PI * u_time + PI), 0.0);
-}
-
-float sphere_rad()
-{
-	const float PI = 3.14159;
-
-	return sin(PI * u_time);
-}
-
-//-------------------------//
-
 bool in_brick_bounds(uint3 pos)
 {
 	return pos.x < BRICK_SIZE && pos.y < BRICK_SIZE && pos.z < BRICK_SIZE;
@@ -120,63 +95,23 @@ bool in_brick_bounds(uint3 pos)
 
 uint voxel_exists(uint brick, uint3 pos)
 {
-	//TEMP!!! JUST FOR DEMO
-
-	uint brickX = brick % u_mapSize.x;
-	uint brickY = (brick / u_mapSize.x) % u_mapSize.y;
-	uint brickZ = brick / (u_mapSize.x * u_mapSize.y);
-
-	pos.x += BRICK_SIZE * brickX;
-	pos.y += BRICK_SIZE * brickY;
-	pos.z += BRICK_SIZE * brickZ;
-
-	float3 normPos = (float3(pos) + 0.5) / float3(u_mapSize * BRICK_SIZE);
-	normPos *= 2.0;
-	normPos -= 1.0;
-
-	float3 centerPos = normPos - sphere_pos();
-
-	float rad = sphere_rad();
-	if(dot(centerPos, centerPos) < rad * rad)
-		return 1;
-	else
-		return 0;
-
-	/*uint idx = pos.x + BRICK_SIZE * (pos.y + BRICK_SIZE * pos.z);
+	uint idx = pos.x + BRICK_SIZE * (pos.y + BRICK_SIZE * pos.z);
 	uint arrIdx = idx / 32;
 	uint bitIdx = idx % 32;
 
-	return (u_bricks[brick].bitmap[arrIdx] & (1 << bitIdx)) != 0;*/
-}
-
-//TEMP!!! JUST FOR DEMO
-float3 hsv_to_rgb(float3 c)
-{
-	float4 K = float4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-	float3 p = abs(frac(c.xxx + K.xyz) * 6.0 - K.www);
-	return c.z * lerp(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+	return (u_bricks[brick * BRICK_STRIDE + arrIdx] & (1 << bitIdx)) != 0;
 }
 
 float3 get_voxel_color(uint brick, uint3 pos)
 {
-	//TEMP!!! JUST FOR DEMO
-
-	uint brickY = (brick / u_mapSize.x) % u_mapSize.y;
-
-	pos.y += BRICK_SIZE * brickY;
-
-	float normPos = (float(pos.y) + 0.5) / float(u_mapSize.y * BRICK_SIZE);
-
-	return hsv_to_rgb(float3(normPos + u_time, 0.8, 1.0));
-
-	/*uint idx = pos.x + BRICK_SIZE * (pos.y + BRICK_SIZE * pos.z);
-	uint packedColor = u_bricks[brick].colors[idx];
+	uint idx = pos.x + BRICK_SIZE * (pos.y + BRICK_SIZE * pos.z);
+	uint packedColor = u_bricks[brick * BRICK_STRIDE + BRICK_BITMAP_LEN + idx];
 
 	uint r = (packedColor >> 24) & 0xFF;
 	uint g = (packedColor >> 16) & 0xFF;
 	uint b = (packedColor >> 8) & 0xFF;
 
-	return float3((float)r / 255.0, (float)g / 255.0, (float)b / 255.0);*/
+	return float3((float)r / 255.0, (float)g / 255.0, (float)b / 255.0);
 }
 
 struct IntersectBrickOut
@@ -234,22 +169,8 @@ bool in_map_bounds(uint3 pos)
 
 uint get_brick(uint3 pos)
 {
-	//TEMP!!! JUST FOR DEMO
-	
-	float3 normPos = (float3(pos) + 0.5) / float3(u_mapSize);
-	normPos *= 2.0;
-	normPos -= 1.0;
-
-	float3 centerPos = normPos - sphere_pos();
-
-	float rad = sphere_rad() + 1.0 / float(u_mapSize.x);
-	if(dot(centerPos, centerPos) < rad * rad)
-		return pos.x + u_mapSize.x * (pos.y + u_mapSize.y * pos.z);
-	else
-		return EMPTY_BRICK;
-
-	//uint idx = pos.x + u_mapSize.x * (pos.y + u_mapSize.y * pos.z);
-	//return u_map[idx];
+	uint idx = pos.x + u_mapSize.x * (pos.y + u_mapSize.y * pos.z);
+	return u_map[idx];
 }
 
 struct IntersectMapOut

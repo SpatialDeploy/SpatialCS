@@ -42,7 +42,7 @@ public class VolumeRendererFeature : ScriptableRendererFeature
 		volume.mapBuf = new ComputeBuffer(mapBufSize, sizeof(uint));
 		volume.mapBuf.SetData(brickmap, 0, 0, mapBufSize);
 
-		volume.brickBuf = new ComputeBuffer(brickBufSize, sizeof(uint));
+		volume.brickBuf = new ComputeBuffer(brickBufSize == 0 ? 1 : brickBufSize, sizeof(uint));
 		volume.brickBuf.SetData(brickmap, mapBufSize, 0, brickBufSize);
 
 		return volume;
@@ -82,12 +82,6 @@ public class VolumeRendererFeature : ScriptableRendererFeature
         m_renderPass.SetVolumeGameObject(gameObject);
     }
 
-	//TEMP!!! JUST FOR DEMO
-	public void SetCurrentTime(float t)
-	{
-		m_renderPass.SetCurrentTime(t);
-	}
-
     class VolumeRenderPass : ScriptableRenderPass
     {
         private const int WORKGROUP_SIZE_X = 8;
@@ -97,7 +91,6 @@ public class VolumeRendererFeature : ScriptableRendererFeature
         private readonly ComputeShader m_shader;
         private GameObject m_volumeObject;
         private VoxelVolume m_curVolume;
-        private float m_time = 0.5f; //TEMP!!! JUST FOR DEMO
 
         private RenderTexture m_outTexture;
 
@@ -119,12 +112,6 @@ public class VolumeRendererFeature : ScriptableRendererFeature
         public void SetVolumeGameObject(GameObject gameObject)
         {
             m_volumeObject = gameObject;
-        }
-
-        //TEMP!!! JUST FOR DEMO
-        public void SetCurrentTime(float t)
-        {
-            m_time = t;
         }
 
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
@@ -207,8 +194,6 @@ public class VolumeRendererFeature : ScriptableRendererFeature
                 m_shader.SetInts("u_mapSize", mapSize);
                 m_shader.SetBuffer(0, "u_map", m_curVolume.mapBuf);
                 m_shader.SetBuffer(0, "u_bricks", m_curVolume.brickBuf);
-
-                m_shader.SetFloat("u_time", m_time); //TEMP!!! JUST FOR DEMO
 
                 cmd.SetComputeTextureParam(m_shader, 0, "u_srcColorTexture", colorHandle);
                 cmd.SetComputeTextureParam(m_shader, 0, "u_srcDepthTexture", depthHandle);
