@@ -92,7 +92,7 @@ public class VoxelVideoPlayer : MonoBehaviour
     {
         //load video:
 	    //-----------------
-        m_video = LoadVoxelVideo("Videos/test_video");
+        m_video = LoadVoxelVideo("Videos/mandelbulb_hihires");
         if(m_video == null)
         {
             Debug.LogWarning("Failed to load voxel video file");
@@ -103,10 +103,8 @@ public class VoxelVideoPlayer : MonoBehaviour
 	    //-----------------
         m_isPlaying = true;
         m_curTime = 0.0f;
-        m_curFrame = 0;
-
-        m_curVolume = VolumeRendererFeature.CreateVolume(m_video.size, m_video.frames[0]);
-        m_renderFeature.SetCurrentVolume(m_curVolume);
+        m_curFrame = -1;
+        m_curVolume = null;
 
         //setup bounding box rendering:
 	    //-----------------

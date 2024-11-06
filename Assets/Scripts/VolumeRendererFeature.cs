@@ -19,7 +19,9 @@ public class VolumeRendererFeature : ScriptableRendererFeature
 {
     [SerializeField]
     private ComputeShader m_shader = null;
-    private VolumeRenderPass m_renderPass;
+    private VolumeRenderPass m_renderPass = null;
+    private VoxelVolume m_curVolume = null;
+    private GameObject m_volumeGameObject = null;
 
     //-------------------------/
 
@@ -62,6 +64,9 @@ public class VolumeRendererFeature : ScriptableRendererFeature
             name: "Custom Volume Pass",
             shader: m_shader
         );
+
+        m_renderPass.SetCurrentVolume(m_curVolume);
+        m_renderPass.SetVolumeGameObject(m_volumeGameObject);
     }
 
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
@@ -74,11 +79,13 @@ public class VolumeRendererFeature : ScriptableRendererFeature
 
 	public void SetCurrentVolume(VoxelVolume volume)
 	{
+        m_curVolume = volume;
 		m_renderPass.SetCurrentVolume(volume);
 	}
 
     public void SetVolumeGameObject(GameObject gameObject)
     {
+        m_volumeGameObject = gameObject;
         m_renderPass.SetVolumeGameObject(gameObject);
     }
 
