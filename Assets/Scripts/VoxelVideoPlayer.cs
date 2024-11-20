@@ -92,7 +92,7 @@ public class VoxelVideoPlayer : MonoBehaviour
     {
         //load video:
 	    //-----------------
-        m_video = LoadVoxelVideo("Videos/mandelbulb_hihires");
+        m_video = LoadVoxelVideo("Videos/test_video");
         if(m_video == null)
         {
             Debug.LogWarning("Failed to load voxel video file");
