@@ -108,6 +108,11 @@ public class VoxelVideoPlayer : MonoBehaviour
 
         //setup bounding box rendering:
 	    //-----------------
+        if(m_renderFeature != null)
+            m_renderFeature.SetVolumeGameObject(transform.gameObject);
+
+        //setup bounding box rendering:
+	    //-----------------
         SetupBoundingBox();
     }
 
