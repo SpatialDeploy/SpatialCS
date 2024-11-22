@@ -1,0 +1,62 @@
+# Blender 4.3.0 MTL File: 'untitled.blend'
+# www.blender.org
+
+newmtl _chunk_base_north_platform_Alpha_3dcUV_Atlas_color
+Ns 1.960786
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+illum 1
+map_Kd ./_chunk_base_north_platform_alpha_3dcuv_atlas_color.png
+map_d ./_chunk_base_north_platform_alpha_3dcuv_atlas_color.png
+
+newmtl _chunk_base_north_shop_Alpha_3dcUV_Atlas_color
+Ns 1.960786
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+illum 1
+map_Kd ./_chunk_base_north_shop_alpha_3dcuv_atlas_color.png
+map_d ./_chunk_base_north_shop_alpha_3dcuv_atlas_color.png
+
+newmtl _chunk_base_north_walls_f_Alpha_3dcUV_Atlas_color2
+Ns 1.960786
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+illum 1
+map_Kd ./_chunk_base_north_walls_f_alpha_3dcuv_atlas_color.png
+map_d ./_chunk_base_north_walls_f_alpha_3dcuv_atlas_color.png
+
+newmtl base_north_arches_periph2
+Ns 1.960786
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+illum 1
+map_Kd ./base_north_arches_periph.png
+map_d ./base_north_arches_periph.png
+
+newmtl base_north_arches_periph4
+Ns 1.960786
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+illum 1
+map_Kd ./base_north_arches_periph.png
+map_d ./base_north_arches_periph.png
+
+newmtl grass_stair_card_01_lambert174131
+Ns 1.960786
+Ka 1.000000 1.000000 1.000000
+Ks 0.000000 0.000000 0.000000
+Ke 0.000000 0.000000 0.000000
+Ni 1.000000
+illum 1
+map_Kd ./mage_spawn_pad_b.png
+map_d ./mage_spawn_pad_b.png
