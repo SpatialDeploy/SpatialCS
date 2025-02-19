@@ -14,6 +14,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_Active: 1
   m_shader: {fileID: 7200000, guid: 2f18aba30f6aa3241beb2900b1b2e54e, type: 3}
+--- !u!114 &-1025147071011717024
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aa23b0738b0f5f7479f615727f24def3, type: 3}
+  m_Name: SpatialCSrendererFeature
+  m_EditorClassIdentifier: 
+  m_Active: 1
+  m_shader: {fileID: 7200000, guid: 2f18aba30f6aa3241beb2900b1b2e54e, type: 3}
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -31,8 +45,8 @@ MonoBehaviour:
     hdrDebugViewPS: {fileID: 4800000, guid: 573620ae32aec764abd4d728906d2587, type: 3}
   m_RendererFeatures:
   - {fileID: 8158091020168165789}
-  - {fileID: -3205179886403535246}
-  m_RendererFeatureMap: 9d796d368f5c377172beb005e0e984d3
+  - {fileID: -1025147071011717024}
+  m_RendererFeatureMap: 9d796d368f5c37716080d09d2bf2c5f1
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}

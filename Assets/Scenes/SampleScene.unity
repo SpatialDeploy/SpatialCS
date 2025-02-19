@@ -511,6 +511,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Summoners Rift
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 09319952bb3b13e47b08a1a7caac758b, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects:
@@ -2696,7 +2700,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!33 &596077360
 MeshFilter:
   m_ObjectHideFlags: 0
@@ -2832,7 +2836,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b662351a1c7290b4bbaa0e8437ff26d9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_renderFeature: {fileID: -3205179886403535246, guid: 3e693523d0e451945954bdaca407e1a8, type: 2}
+  spatialName: Spatials/illaoi.splv
+  m_renderFeature: {fileID: -1025147071011717024, guid: 3e693523d0e451945954bdaca407e1a8, type: 2}
   m_boundingBoxMaterial: {fileID: 2100000, guid: 99f299eeb6ac59e4c95839637921914a, type: 2}
 --- !u!4 &611285412
 Transform:
@@ -2843,8 +2848,8 @@ Transform:
   m_GameObject: {fileID: 611285407}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.52, z: -1.8}
-  m_LocalScale: {x: 3, y: 3, z: 3}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 2.73, y: 2.73, z: 2.73}
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 1684604420}
