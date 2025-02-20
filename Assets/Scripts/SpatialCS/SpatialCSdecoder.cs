@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading;
 using SPLVnative;
+using System.Diagnostics;
 
 //-------------------------//
 
@@ -263,7 +264,7 @@ public class SpatialCSdecoder
 			{
 				ulong depIdx = (ulong)Marshal.ReadInt64(dependenciesRecursive, (int)(i * sizeof(ulong)));
 
-				Debug.LogWarning("decoding extra frame");
+				UnityEngine.Debug.LogWarning("decoding extra frame");
 				DecodeFrame((uint)depIdx);
 			}
 
@@ -341,14 +342,15 @@ public class SpatialCSdecoder
 	{
 		var data = (SpatialCSdecodingThreadData)arg;
 
-		//var startTime = Time.realtimeSinceStartup;
+        Stopwatch stopwatch = new Stopwatch();
+        stopwatch.Start();
 
 		data.decodedFrame = data.decoder.FrameRefAdd(
 			data.decoder.DecodeFrame(data.frameIdx)
 		);
 
-		//var duration = (Time.realtimeSinceStartup - startTime) * 1000f;
-		//Debug.Log($"decoding took {duration}ms");
+        stopwatch.Stop();
+		UnityEngine.Debug.Log($"decoding took {(float)stopwatch.ElapsedTicks / (float)Stopwatch.Frequency * 1000.0f}ms");
 	}
 
 	//-------------------------//

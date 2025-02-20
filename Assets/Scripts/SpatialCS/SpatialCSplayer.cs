@@ -4,11 +4,13 @@ using System.Collections.Generic;
 using System.Data.SqlTypes;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Defective.JSON;
+using System.Threading.Tasks;
 using SPLVnative;
 using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.VFX;
@@ -24,6 +26,19 @@ public class Spatial
 	
 	public byte[][] frames;
 };
+
+//-------------------------//
+
+//for the web request on android
+public static class ExtensionMethods
+{
+    public static TaskAwaiter<UnityWebRequest.Result> GetAwaiter(this UnityWebRequestAsyncOperation operation)
+    {
+        var tcs = new TaskCompletionSource<UnityWebRequest.Result>();
+        operation.completed += obj => { tcs.SetResult(operation.webRequest.result); };
+        return tcs.Task.GetAwaiter();
+    }
+}
 
 //-------------------------//
 
@@ -98,11 +113,35 @@ public class SpatialCSplayer : MonoBehaviour
 
 	//-------------------------//
 
-	private void Start()
+	private async void Start()
 	{
 		//create decoder:
 		//-----------------
 		string spatialPath = Path.Combine(Application.streamingAssetsPath, spatialName);
+
+		//on android, StreamingAssets gets compressed and packaged strangely, we need to copy to a normal file
+        if(Application.platform == RuntimePlatform.Android)
+        {
+            using(UnityWebRequest www = UnityWebRequest.Get(spatialPath))
+            {
+                UnityWebRequest.Result result = await www.SendWebRequest();
+                if(result == UnityWebRequest.Result.Success)
+                {
+                    string extractedPath = Path.Combine(Application.persistentDataPath, spatialName);
+					string directoryPath = Path.GetDirectoryName(extractedPath);
+					if(!string.IsNullOrEmpty(directoryPath))
+						Directory.CreateDirectory(directoryPath);
+
+                    File.WriteAllBytes(extractedPath, www.downloadHandler.data);
+                    spatialPath = extractedPath;
+                }
+                else
+                {
+                    Debug.LogError($"failed to load file: {www.error}");
+                    return;
+                }
+            }
+        }
 
 		try
 		{
@@ -134,9 +173,12 @@ public class SpatialCSplayer : MonoBehaviour
 
 		//start decoding first frame:
 		//-----------------
-		m_decodingFrame = m_decoder.GetClosestDecodableFrameIdx(0);
-		m_decoder.StartDecodingFrame(m_decodingFrame);
-		m_isDecodingFrame = true;
+		if(m_decoder != null)
+		{
+			m_decodingFrame = m_decoder.GetClosestDecodableFrameIdx(0);
+			m_decoder.StartDecodingFrame(m_decodingFrame);
+			m_isDecodingFrame = true;
+		}
 	}
 
 	private void Update()

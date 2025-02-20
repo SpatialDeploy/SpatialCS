@@ -49,6 +49,14 @@ float2 intersect_aabb(float3 boxMin, float3 boxMax, float3 rayPos, float3 invRay
 	return float2(tNear, tFar);
 }
 
+float srgb_to_linear(float col)
+{
+	if(col <= 0.04045)
+		return col / 12.91;
+	else
+		return pow((col + 0.055) / 1.055, 2.4);
+}
+
 float3 background_color(float2 uv)
 {
 	return u_srcColorTexture.SampleLevel(sampleru_srcColorTexture, uv, 0).xyz;
@@ -307,7 +315,13 @@ void main(uint3 id : SV_DispatchThreadID)
 			if(maxDepth < traceDepth)
 				color = background_color(uv);
 			else
+			{
 				color = result.color;
+
+				color.r = srgb_to_linear(color.r);
+				color.g = srgb_to_linear(color.g);
+				color.b = srgb_to_linear(color.b);
+			}
 		}
 		else
 			color = background_color(uv);
