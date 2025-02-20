@@ -56,5 +56,5 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "VoxelVideoPlayer-Native.sln"
+    "dotnet.defaultSolution": "SpatialCS.sln"
 }
