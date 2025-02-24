@@ -1,4 +1,3 @@
-using UnityEngine;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -124,7 +123,7 @@ public class SpatialCSdecoder
 		//validate:
 		//-----------------
 		if(targetFrameIdx >= m_metadata.framecount)
-			throw new System.Exception("frame index out of bounds");
+			throw new Exception("frame index out of bounds");
 
 		//loop and check all previous frames:
 		//-----------------

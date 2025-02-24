@@ -1,4 +1,4 @@
-using System.Drawing;
+using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -29,7 +29,7 @@ public class SpatialCSrendererFeature : ScriptableRendererFeature
 	//-------------------------/
 
 	private const int BRICK_SIZE = 8;
-	public static VoxelVolume CreateVolume(Vector3Int size, byte[] map, byte[] bricks)
+	public static VoxelVolume CreateVolume(Vector3Int size, NativeArray<byte> map, NativeArray<byte> bricks)
 	{
 		VoxelVolume volume = new VoxelVolume();
 		volume.size = new Vector3Int(size.x * BRICK_SIZE, size.z * BRICK_SIZE, size.y * BRICK_SIZE);
@@ -38,11 +38,11 @@ public class SpatialCSrendererFeature : ScriptableRendererFeature
 		int mapLen = map.Length / sizeof(uint);
 		int bricksLen = bricks.Length / sizeof(uint);
 
-		volume.mapBuf = new ComputeBuffer(mapLen, sizeof(uint));
-		volume.mapBuf.SetData(map, 0, 0, map.Length);
+		volume.mapBuf = new ComputeBuffer(mapLen, sizeof(uint), ComputeBufferType.Default, ComputeBufferMode.Immutable);
+		volume.mapBuf.SetData(map);
 
-		volume.brickBuf = new ComputeBuffer(bricksLen == 0 ? 1 : bricksLen, sizeof(uint));
-		volume.brickBuf.SetData(bricks, 0, 0, bricks.Length);
+		volume.brickBuf = new ComputeBuffer(bricksLen == 0 ? 1 : bricksLen, sizeof(uint), ComputeBufferType.Default, ComputeBufferMode.Immutable);
+		volume.brickBuf.SetData(bricks);
 
 		return volume;
 	}

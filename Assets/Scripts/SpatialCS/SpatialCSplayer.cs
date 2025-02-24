@@ -1,19 +1,13 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Data.SqlTypes;
 using System.IO;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using SPLVnative;
-using Unity.VisualScripting;
+using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Networking;
-using UnityEngine.Rendering;
-using UnityEngine.Rendering.Universal;
-using UnityEngine.VFX;
 
 //-------------------------//
 
@@ -32,12 +26,12 @@ public class Spatial
 //for the web request on android
 public static class ExtensionMethods
 {
-    public static TaskAwaiter<UnityWebRequest.Result> GetAwaiter(this UnityWebRequestAsyncOperation operation)
-    {
-        var tcs = new TaskCompletionSource<UnityWebRequest.Result>();
-        operation.completed += obj => { tcs.SetResult(operation.webRequest.result); };
-        return tcs.Task.GetAwaiter();
-    }
+	public static TaskAwaiter<UnityWebRequest.Result> GetAwaiter(this UnityWebRequestAsyncOperation operation)
+	{
+		var tcs = new TaskCompletionSource<UnityWebRequest.Result>();
+		operation.completed += obj => { tcs.SetResult(operation.webRequest.result); };
+		return tcs.Task.GetAwaiter();
+	}
 }
 
 //-------------------------//
@@ -120,28 +114,28 @@ public class SpatialCSplayer : MonoBehaviour
 		string spatialPath = Path.Combine(Application.streamingAssetsPath, spatialName);
 
 		//on android, StreamingAssets gets compressed and packaged strangely, we need to copy to a normal file
-        if(Application.platform == RuntimePlatform.Android)
-        {
-            using(UnityWebRequest www = UnityWebRequest.Get(spatialPath))
-            {
-                UnityWebRequest.Result result = await www.SendWebRequest();
-                if(result == UnityWebRequest.Result.Success)
-                {
-                    string extractedPath = Path.Combine(Application.persistentDataPath, spatialName);
+		if(Application.platform == RuntimePlatform.Android)
+		{
+			using(UnityWebRequest www = UnityWebRequest.Get(spatialPath))
+			{
+				UnityWebRequest.Result result = await www.SendWebRequest();
+				if(result == UnityWebRequest.Result.Success)
+				{
+					string extractedPath = Path.Combine(Application.persistentDataPath, spatialName);
 					string directoryPath = Path.GetDirectoryName(extractedPath);
 					if(!string.IsNullOrEmpty(directoryPath))
 						Directory.CreateDirectory(directoryPath);
 
-                    File.WriteAllBytes(extractedPath, www.downloadHandler.data);
-                    spatialPath = extractedPath;
-                }
-                else
-                {
-                    Debug.LogError($"failed to load file: {www.error}");
-                    return;
-                }
-            }
-        }
+					File.WriteAllBytes(extractedPath, www.downloadHandler.data);
+					spatialPath = extractedPath;
+				}
+				else
+				{
+					Debug.LogError($"failed to load file: {www.error}");
+					return;
+				}
+			}
+		}
 
 		try
 		{
@@ -201,30 +195,46 @@ public class SpatialCSplayer : MonoBehaviour
 			if(m_curVolume != null)
 				SpatialCSrendererFeature.DestroyVolume(m_curVolume);
 
-			//copy frame data to managed memory 
-			//TODO: directly upload unmanaged memory to GPU with unity API
-
+			//get handles to unmanaged memory
 			SPLVframe frameStruct = Marshal.PtrToStructure<SPLVframe>(decodedFrame.frame);
-			
-			uint mapSize = frameStruct.width * frameStruct.height * frameStruct.depth * sizeof(uint);
-			byte[] mapBuf = new byte[mapSize];
-			
-			uint brickSize = frameStruct.bricksLen * (uint)Marshal.SizeOf<SPLVbrick>();
-			byte[] brickBuf = new byte[brickSize];
+			uint mapBufSize = frameStruct.width * frameStruct.height * frameStruct.depth * sizeof(uint);
+			uint brickBufSize = frameStruct.bricksLen * (uint)Marshal.SizeOf<SPLVbrick>();
 
-			Marshal.Copy(frameStruct.map   , mapBuf  , 0, (int)mapSize  );
-			Marshal.Copy(frameStruct.bricks, brickBuf, 0, (int)brickSize);
+			NativeArray<byte> mapBuf;
+			NativeArray<byte> brickBuf;
+			unsafe
+			{
+				mapBuf   = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<byte>((void*)frameStruct.map   , (int)mapBufSize  , Allocator.None);
+				brickBuf = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<byte>((void*)frameStruct.bricks, (int)brickBufSize, Allocator.None);
+			}
 
-			//create new volume, set
+			//create new volume
+		#if ENABLE_UNITY_COLLECTIONS_CHECKS
+			AtomicSafetyHandle mapSafetyHandle = AtomicSafetyHandle.Create();
+			AtomicSafetyHandle brickSafetyHandle = AtomicSafetyHandle.Create();
+
+			NativeArrayUnsafeUtility.SetAtomicSafetyHandle(ref mapBuf, mapSafetyHandle);
+			NativeArrayUnsafeUtility.SetAtomicSafetyHandle(ref brickBuf, brickSafetyHandle);
+		#endif
+
 			m_curVolume = SpatialCSrendererFeature.CreateVolume(
 				new Vector3Int((int)frameStruct.width, (int)frameStruct.height, (int)frameStruct.depth),
 				mapBuf, brickBuf
 			);
 
+		#if ENABLE_UNITY_COLLECTIONS_CHECKS
+			AtomicSafetyHandle.Release(mapSafetyHandle);
+			AtomicSafetyHandle.Release(brickSafetyHandle);
+		#endif
+
+			//set current frame
 			m_renderFeature.SetCurrentVolume(m_curVolume);
 			m_curFrame = (int)m_decodingFrame;
 			m_isDecodingFrame = false;
 
+			//free frame
+			mapBuf.Dispose();
+			brickBuf.Dispose();
 			m_decoder.FreeFrame(decodedFrame);
 		}
 
@@ -233,7 +243,7 @@ public class SpatialCSplayer : MonoBehaviour
 		int nextFrame = (int)(m_curTime * m_metadata.framerate);
 		nextFrame %= (int)m_metadata.framecount;
 
-		if(m_curFrame != nextFrame)
+		if(m_curFrame != nextFrame && !m_isDecodingFrame)
 		{
 			m_decodingFrame = m_decoder.GetClosestDecodableFrameIdx((uint)nextFrame);
 			m_decoder.StartDecodingFrame(m_decodingFrame);
