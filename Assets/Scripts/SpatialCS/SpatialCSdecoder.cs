@@ -18,21 +18,13 @@ public struct SpatialCSmetadata
 	public float duration;
 }
 
-// reference to a frame, used for memory management
-public class SpatialCSframeRef
-{
-	public IntPtr frame;
-	public ulong frameIdx;
-	public int refCount;
-}
-
 // used for handling the background decoder thread
 public class SpatialCSdecodingThreadData
 {
 	public bool active;
 	public Thread thread;
 	public uint frameIdx;
-	public SpatialCSframeRef decodedFrame;
+	public IntPtr decodedFrame;
 	public SpatialCSdecoder decoder;
 }
 
@@ -42,7 +34,7 @@ public class SpatialCSdecodingThreadData
 public class SpatialCSdecoder
 {
 	private IntPtr m_decoder;
-	private List<SpatialCSframeRef> m_decodedFrames;
+	private List<SPLVframeIndexed> m_decodedFrames;
 
 	private SpatialCSmetadata m_metadata;
 	
@@ -68,7 +60,7 @@ public class SpatialCSdecoder
 
 		//initialize fields:
 		//-----------------	
-		m_decodedFrames = new List<SpatialCSframeRef>();
+		m_decodedFrames = new List<SPLVframeIndexed>();
 
 		SPLVdecoder decoderStruct = Marshal.PtrToStructure<SPLVdecoder>(m_decoder);
 		m_metadata.width      = decoderStruct.width;
@@ -99,9 +91,11 @@ public class SpatialCSdecoder
 			Marshal.FreeHGlobal(m_decoder);
 		}
 
-		//TODO: what if something is still using one of the frames?
 		foreach(var frame in m_decodedFrames)
-			FrameRefRemove(frame);
+		{
+			SPLV.FrameDestroy(frame.frame);
+			Marshal.FreeHGlobal(frame.frame);
+		}
 		m_decodedFrames.Clear();
 
 		if(m_decodingThreadData != null && m_decodingThreadData.active)
@@ -182,7 +176,9 @@ public class SpatialCSdecoder
 		{
 			m_decodingThreadData.thread.Join();
 			m_decodingThreadData.active = false;
-			FrameRefRemove(m_decodingThreadData.decodedFrame);
+
+			SPLV.FrameCompactDestroy(m_decodingThreadData.decodedFrame);
+			Marshal.FreeHGlobal(m_decodingThreadData.decodedFrame);
 		}
 
 		//start decoding thread:
@@ -193,9 +189,9 @@ public class SpatialCSdecoder
 		m_decodingThreadData.thread.Start(m_decodingThreadData);
 	}
 
-	public bool TryGetDecodedFrame(out SpatialCSframeRef frame)
+	public bool TryGetDecodedFrame(out IntPtr frame)
 	{
-		frame = null;
+		frame = IntPtr.Zero;
 
 		//ensure thread is active:
 		//-----------------
@@ -212,21 +208,16 @@ public class SpatialCSdecoder
 		return true;
 	}
 
-	public void FreeFrame(SpatialCSframeRef frame)
+	public void FreeFrame(IntPtr frame)
 	{
-		FrameRefRemove(frame);
+		SPLV.FrameCompactDestroy(m_decodingThreadData.decodedFrame);
+		Marshal.FreeHGlobal(m_decodingThreadData.decodedFrame);
 	}
 
 	//-------------------------//
 
-	private SpatialCSframeRef DecodeFrame(uint frameIdx)
+	private IntPtr DecodeFrame(uint frameIdx)
 	{
-		//check if frame was already decoded:
-		//-----------------
-		long searchResult = SearchDecodedFrames(frameIdx);
-		if(searchResult >= 0)
-			return m_decodedFrames[(int)searchResult];
-
 		//check if dependencies were already decoded:
 		//-----------------
 		ulong numDependencies;
@@ -275,18 +266,21 @@ public class SpatialCSdecoder
 		IntPtr dependencies = Marshal.AllocHGlobal((int)numDependencies * Marshal.SizeOf<SPLVframeIndexed>());
 		for(uint i = 0; i < numDependencies; i++)
 		{
+			//TODO: simplify
+
 			ulong depIdx = (ulong)Marshal.ReadInt64(dependencyIndices, (int)(i * sizeof(ulong)));
 
 			SPLVframeIndexed dependencyStruct = Marshal.PtrToStructure<SPLVframeIndexed>(dependencies + (int)(i * Marshal.SizeOf<SPLVframeIndexed>()));
 			dependencyStruct.index = depIdx;
-			dependencyStruct.frame =  m_decodedFrames[(int)SearchDecodedFrames(depIdx)].frame;
+			dependencyStruct.frame = m_decodedFrames[(int)SearchDecodedFrames(depIdx)].frame;
 
 			Marshal.StructureToPtr(dependencyStruct, dependencies + (int)(i * Marshal.SizeOf<SPLVframeIndexed>()), false);
 		}
 
 		IntPtr frame = Marshal.AllocHGlobal(Marshal.SizeOf<SPLVframe>());
+		IntPtr frameCompact = Marshal.AllocHGlobal(Marshal.SizeOf<SPLVframeCompact>());
 
-		var decodeError = SPLV.DecoderDecodeFrame(m_decoder, frameIdx, numDependencies, dependencies, frame);
+		var decodeError = SPLV.DecoderDecodeFrame(m_decoder, frameIdx, numDependencies, dependencies, frame, frameCompact);
 		if(decodeError != SPLVerror.SUCCESS)
 		{
 			Marshal.FreeHGlobal(dependencyIndices);
@@ -296,15 +290,6 @@ public class SpatialCSdecoder
 			throw new Exception($"failed to decode frame with error ({decodeError})");
 		}
 
-		//create frame ref:
-		//-----------------
-		var frameRef = new SpatialCSframeRef
-		{
-			frame = frame,
-			frameIdx = frameIdx,
-			refCount = 0
-		};
-
 		//free frames which are no longer dependencies:
 		//-----------------
 		for(int i = m_decodedFrames.Count - 1; i >= 0; i--)
@@ -313,7 +298,7 @@ public class SpatialCSdecoder
 			for(uint j = 0; j < numDependencies; j++)
 			{
 				ulong depIdx = (ulong)Marshal.ReadInt64(dependencyIndices, (int)(j * sizeof(ulong)));
-				if(m_decodedFrames[i].frameIdx == depIdx)
+				if(m_decodedFrames[i].index == depIdx)
 				{
 					found = true;
 					break;
@@ -322,19 +307,24 @@ public class SpatialCSdecoder
 
 			if(!found)
 			{
-				FrameRefRemove(m_decodedFrames[i]);
+				SPLV.FrameDestroy(m_decodedFrames[i].frame);
+				Marshal.FreeHGlobal(m_decodedFrames[i].frame);
+
 				m_decodedFrames.RemoveAt(i);
 			}
 		}
 
-		m_decodedFrames.Add(FrameRefAdd(frameRef));
+		m_decodedFrames.Add(new SPLVframeIndexed{
+			frame = frame,
+			index = frameIdx
+		});
 
 		//cleanup + return:
 		//-----------------
 		Marshal.FreeHGlobal(dependencyIndices);
 		Marshal.FreeHGlobal(dependencies);
 
-		return frameRef;
+		return frameCompact;
 	}
 
 	private static void StartDecodingThread(object arg)
@@ -344,9 +334,7 @@ public class SpatialCSdecoder
         Stopwatch stopwatch = new Stopwatch();
         stopwatch.Start();
 
-		data.decodedFrame = data.decoder.FrameRefAdd(
-			data.decoder.DecodeFrame(data.frameIdx)
-		);
+		data.decodedFrame = data.decoder.DecodeFrame(data.frameIdx);
 
         stopwatch.Stop();
 		UnityEngine.Debug.Log($"decoding took {(float)stopwatch.ElapsedTicks / (float)Stopwatch.Frequency * 1000.0f}ms");
@@ -358,28 +346,10 @@ public class SpatialCSdecoder
 	{
 		for(int i = 0; i < m_decodedFrames.Count; i++)
 		{
-			if(m_decodedFrames[i].frameIdx == frameIdx)
+			if(m_decodedFrames[i].index == frameIdx)
 				return i;
 		}
 
 		return -1;
-	}
-
-	//-------------------------//
-
-	private void FrameRefRemove(SpatialCSframeRef ref_)
-	{
-		ref_.refCount--;
-		if(ref_.refCount <= 0)
-		{
-			SPLV.FrameDestroy(ref_.frame);
-			Marshal.FreeHGlobal(ref_.frame);
-		}
-	}
-
-	private SpatialCSframeRef FrameRefAdd(SpatialCSframeRef ref_)
-	{
-		ref_.refCount++;
-		return ref_;
 	}
 }

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -16,6 +17,7 @@ public class SpatialCSrendererFeature : ScriptableRendererFeature
 
 		public ComputeBuffer mapBuf;
 		public ComputeBuffer brickBuf;
+		public ComputeBuffer voxelBuf;
 	};
 
 	//-------------------------/
@@ -29,7 +31,7 @@ public class SpatialCSrendererFeature : ScriptableRendererFeature
 	//-------------------------/
 
 	private const int BRICK_SIZE = 8;
-	public static VoxelVolume CreateVolume(Vector3Int size, NativeArray<byte> map, NativeArray<byte> bricks)
+	public static VoxelVolume CreateVolume(Vector3Int size, NativeArray<byte> map, NativeArray<byte> bricks, NativeArray<byte> voxels)
 	{
 		VoxelVolume volume = new VoxelVolume();
 		volume.size = new Vector3Int(size.x * BRICK_SIZE, size.z * BRICK_SIZE, size.y * BRICK_SIZE);
@@ -37,12 +39,23 @@ public class SpatialCSrendererFeature : ScriptableRendererFeature
 
 		int mapLen = map.Length / sizeof(uint);
 		int bricksLen = bricks.Length / sizeof(uint);
+		int voxelsLen = voxels.Length / sizeof(uint);
+
+		Stopwatch stopwatch = new Stopwatch();
+		stopwatch.Start();
 
 		volume.mapBuf = new ComputeBuffer(mapLen, sizeof(uint), ComputeBufferType.Default, ComputeBufferMode.Immutable);
 		volume.mapBuf.SetData(map);
 
 		volume.brickBuf = new ComputeBuffer(bricksLen == 0 ? 1 : bricksLen, sizeof(uint), ComputeBufferType.Default, ComputeBufferMode.Immutable);
 		volume.brickBuf.SetData(bricks);
+
+		volume.voxelBuf = new ComputeBuffer(voxelsLen == 0 ? 1 : voxelsLen, sizeof(uint), ComputeBufferType.Default, ComputeBufferMode.Immutable);
+		volume.voxelBuf.SetData(voxels);
+
+		stopwatch.Stop();
+		UnityEngine.Debug.Log($"upload took {(float)stopwatch.ElapsedTicks / (float)Stopwatch.Frequency * 1000.0f}ms");
+		UnityEngine.Debug.Log($"map buf: {map.Length / 1000}kb, brick buf: {bricks.Length / 1000}kb, voxel buf: {voxels.Length / 1000}kb");
 
 		return volume;
 	}
@@ -51,6 +64,7 @@ public class SpatialCSrendererFeature : ScriptableRendererFeature
 	{
 		volume.mapBuf.Release();
 		volume.brickBuf.Release();
+		volume.voxelBuf.Release();
 	}
 
 	//-------------------------//
@@ -198,6 +212,7 @@ public class SpatialCSrendererFeature : ScriptableRendererFeature
 				m_shader.SetInts("u_mapSize", mapSize);
 				m_shader.SetBuffer(0, "u_map", m_curVolume.mapBuf);
 				m_shader.SetBuffer(0, "u_bricks", m_curVolume.brickBuf);
+				m_shader.SetBuffer(0, "u_voxels", m_curVolume.voxelBuf);
 
 				cmd.SetComputeTextureParam(m_shader, 0, "u_srcColorTexture", colorHandle);
 				cmd.SetComputeTextureParam(m_shader, 0, "u_srcDepthTexture", depthHandle);

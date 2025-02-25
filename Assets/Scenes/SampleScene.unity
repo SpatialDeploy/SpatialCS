@@ -2169,7 +2169,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b662351a1c7290b4bbaa0e8437ff26d9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  spatialName: Spatials/illaoi_512.splv
+  spatialName: Spatials/illaoi_256.splv
   m_renderFeature: {fileID: -1025147071011717024, guid: 3e693523d0e451945954bdaca407e1a8, type: 2}
   m_boundingBoxMaterial: {fileID: 2100000, guid: 99f299eeb6ac59e4c95839637921914a, type: 2}
 --- !u!4 &611285412

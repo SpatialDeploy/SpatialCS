@@ -9,8 +9,7 @@
 
 #define BRICK_SIZE 8
 #define BRICK_BITMAP_LEN (((BRICK_SIZE * BRICK_SIZE * BRICK_SIZE + 31) & (~31)) / 32)
-#define BRICK_COLORS_LEN (BRICK_SIZE * BRICK_SIZE * BRICK_SIZE)
-#define BRICK_STRIDE (BRICK_BITMAP_LEN + BRICK_COLORS_LEN)
+#define BRICK_STRIDE (BRICK_BITMAP_LEN + 1)
 
 #define EMPTY_BRICK 0xFFFFFFFF
 
@@ -27,6 +26,7 @@ float4x4 u_invProj;
 uint3 u_mapSize;
 StructuredBuffer<uint> u_map;
 StructuredBuffer<uint> u_bricks;
+StructuredBuffer<uint> u_voxels;
 
 Texture2D<float4> u_srcDepthTexture;
 Texture2D<float4> u_srcColorTexture;
@@ -113,8 +113,19 @@ uint voxel_exists(uint brick, uint3 pos)
 float3 get_voxel_color(uint brick, uint3 pos)
 {
 	uint idx = pos.x + BRICK_SIZE * (pos.y + BRICK_SIZE * pos.z);
-	uint packedColor = u_bricks[brick * BRICK_STRIDE + BRICK_BITMAP_LEN + idx];
+	uint colorOffset = u_bricks[brick * BRICK_STRIDE + BRICK_BITMAP_LEN];
 
+	uint bitmapIdx = idx / 32;
+	for(uint i = 0; i <= bitmapIdx; i++)
+	{
+		uint bits = u_bricks[brick * BRICK_STRIDE + i];
+		if(i == bitmapIdx)
+			bits &= (1 << (idx % 32)) - 1;
+
+		colorOffset += countbits(bits);
+	}
+
+	uint packedColor = u_voxels[colorOffset];
 	uint r = (packedColor >> 24) & 0xFF;
 	uint g = (packedColor >> 16) & 0xFF;
 	uint b = (packedColor >> 8) & 0xFF;

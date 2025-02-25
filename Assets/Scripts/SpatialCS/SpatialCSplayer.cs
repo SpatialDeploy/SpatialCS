@@ -189,42 +189,48 @@ public class SpatialCSplayer : MonoBehaviour
 
 		//get newly decoded frame, if it exists:
 		//-----------------
-		if(m_isDecodingFrame && m_decoder.TryGetDecodedFrame(out SpatialCSframeRef decodedFrame))
+		if(m_isDecodingFrame && m_decoder.TryGetDecodedFrame(out IntPtr decodedFrame))
 		{
 			//destroy old volume
 			if(m_curVolume != null)
 				SpatialCSrendererFeature.DestroyVolume(m_curVolume);
 
 			//get handles to unmanaged memory
-			SPLVframe frameStruct = Marshal.PtrToStructure<SPLVframe>(decodedFrame.frame);
-			uint mapBufSize = frameStruct.width * frameStruct.height * frameStruct.depth * sizeof(uint);
-			uint brickBufSize = frameStruct.bricksLen * (uint)Marshal.SizeOf<SPLVbrick>();
+			SPLVframeCompact frameStruct = Marshal.PtrToStructure<SPLVframeCompact>(decodedFrame);
+			ulong mapBufSize = frameStruct.width * frameStruct.height * frameStruct.depth * sizeof(uint);
+			ulong brickBufSize = frameStruct.numBricks * (ulong)Marshal.SizeOf<SPLVbrickCompact>();
+			ulong voxelBufSize = frameStruct.numVoxels * sizeof(UInt32);
 
 			NativeArray<byte> mapBuf;
 			NativeArray<byte> brickBuf;
+			NativeArray<byte> voxelBuf;
 			unsafe
 			{
 				mapBuf   = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<byte>((void*)frameStruct.map   , (int)mapBufSize  , Allocator.None);
 				brickBuf = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<byte>((void*)frameStruct.bricks, (int)brickBufSize, Allocator.None);
+				voxelBuf = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<byte>((void*)frameStruct.voxels, (int)voxelBufSize, Allocator.None);
 			}
 
 			//create new volume
 		#if ENABLE_UNITY_COLLECTIONS_CHECKS
 			AtomicSafetyHandle mapSafetyHandle = AtomicSafetyHandle.Create();
 			AtomicSafetyHandle brickSafetyHandle = AtomicSafetyHandle.Create();
+			AtomicSafetyHandle voxelSafetyHandle = AtomicSafetyHandle.Create();
 
 			NativeArrayUnsafeUtility.SetAtomicSafetyHandle(ref mapBuf, mapSafetyHandle);
 			NativeArrayUnsafeUtility.SetAtomicSafetyHandle(ref brickBuf, brickSafetyHandle);
+			NativeArrayUnsafeUtility.SetAtomicSafetyHandle(ref voxelBuf, voxelSafetyHandle);
 		#endif
 
 			m_curVolume = SpatialCSrendererFeature.CreateVolume(
 				new Vector3Int((int)frameStruct.width, (int)frameStruct.height, (int)frameStruct.depth),
-				mapBuf, brickBuf
+				mapBuf, brickBuf, voxelBuf
 			);
 
 		#if ENABLE_UNITY_COLLECTIONS_CHECKS
 			AtomicSafetyHandle.Release(mapSafetyHandle);
 			AtomicSafetyHandle.Release(brickSafetyHandle);
+			AtomicSafetyHandle.Release(voxelSafetyHandle);
 		#endif
 
 			//set current frame
