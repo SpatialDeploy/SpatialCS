@@ -143,6 +143,7 @@ public class SpatialCSrendererFeature : ScriptableRendererFeature
 			if (m_outTexture != null && (m_outTexture.width != width || m_outTexture.height != height))
 			{
 				m_outTexture.Release();
+				DestroyImmediate(m_outTexture);
 				m_outTexture = null;
 			}
 
