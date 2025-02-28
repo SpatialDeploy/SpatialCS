@@ -241,6 +241,7 @@ public class SpatialCSplayer : MonoBehaviour
 			//free frame
 			mapBuf.Dispose();
 			brickBuf.Dispose();
+			voxelBuf.Dispose();
 			m_decoder.FreeFrame(decodedFrame);
 		}
 

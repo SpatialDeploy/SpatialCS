@@ -286,6 +286,7 @@ public class SpatialCSdecoder
 			Marshal.FreeHGlobal(dependencyIndices);
 			Marshal.FreeHGlobal(dependencies);
 			Marshal.FreeHGlobal(frame);
+			Marshal.FreeHGlobal(frameCompact);
 
 			throw new Exception($"failed to decode frame with error ({decodeError})");
 		}
